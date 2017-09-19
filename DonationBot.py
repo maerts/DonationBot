@@ -70,7 +70,7 @@ Admin commands\n\
 \n\
 `!donor add {user} {#months}` this will add a new user and a contribution or add a contribution and update the valid date on a donor.\n\
 If today is not the 25th of the month or later, it will count as a donation for this month, if it is made after it will start counting from next month.\n\
-e.g. if today is the 19th of september and you type `!donor nickname 1` it will count towards the end of september. If it is the 25th of September it will count towards the end of October.\n\
+e.g. if today is the 19th of september and you type `!donor add nickname 1` it will count towards the end of september. If it is the 25th of September it will count towards the end of October.\n\
 `!donor expire {user}` find out the expiration for a user. \n\
 `!donor contrib {user}` find out all months added to a user with the date.\n\
 `!donor subs` will list all users in the database with a valid subscription and when it runs out.\n\
