@@ -27,6 +27,10 @@ sql_db = config.get('sql', 'sql.db')
 # - admin roles
 roles_admin = config.get('admin', 'admin.roles').split(',')
 super_admin = config.get('admin', 'admin.super').split(',')
+# - donor role
+donor_role = config.get('donor', 'donor.role')
+# - bot settings
+bot_debug = int(config.get('bot', 'bot.debug'))
 
 # Start discord client
 client = discord.Client()
@@ -254,11 +258,13 @@ def donor(message):
 
         discordid = None
         discordname = ""
+        discordmember = None
         # lookup the userid, a bit clunky but fastest way.
         for member in server.members:
             if member.name == user or (member.name + '#' + member.discriminator) == user or member.id == user:
                discordid = member.id
                discordname = member.name
+               discordmember = member
                break
         if discordid is not None:
             # verify existence of rol on the server
@@ -332,6 +338,11 @@ def donor(message):
                     db_close(db)
 
                     if donationadded:
+                        if bot_debug == 1:
+                            print('Member should be added now')
+                        else:
+                            role = discord.utils.get(server.roles, name=donor_role)
+                            await client.add_roles(discordmember, role)
                         yield from client.send_message(message.channel, "Added donor `{}` to the database with a first payment for `{} months`".format(discordname, month))
                     else:
                         yield from client.send_message(message.channel, "There was a problem adding a donation for donor `{}`. Contact an admin if this problem persists".format(user))
