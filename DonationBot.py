@@ -96,6 +96,8 @@ def on_message(message):
         yield from expire(message)
     if '!subs' == message.content[0:5] and (roleacc(message, 'super') or roleacc(message, 'admin')):
         yield from subscribers(message)
+    if '!subprocess' == message.content[0:5] and roleacc(message, 'super'):
+        yield from subprocess(message)
     if '!payment' == message.content[0:8]:
         yield from payment(message)
     if '!checkdon' == message.content[0:9]:
@@ -114,7 +116,7 @@ def subscribers(message):
     data = c.fetchall()
     c.close()
     db_close(db)
-    cleanup = []
+
     msg = ''
     msg += 'Active subscribers\n'
     msg += '\n'
@@ -141,7 +143,7 @@ def expire(message):
     data = c.fetchall()
     c.close()
     db_close(db)
-    cleanup = []
+
     msg = ''
     msg += 'The following members\' subscription will expire at the end of this month\n'
     msg += '\n'
@@ -149,6 +151,38 @@ def expire(message):
     msg += '----\n'
     for i, d in enumerate(data):
         msg += str(d[1]).ljust(20) + '\n'
+
+    yield from client.send_message(message.author, '```' + msg[:1994] + '```')
+    if len(msg) >= 1994:
+        for i in range(1, round(len(msg)/1994) ):
+            c1 = '```'+ msg[i*1994:(i+1)*1994] + '```'
+            yield from client.send_message(message.author, c1)
+            
+# Helper function to check your payments
+def subprocess(message):
+    current_date = int(time.time())
+
+    # verify existence of discordid on the server
+    db = db_connect()
+    c = db.cursor()
+    c.execute("SELECT * FROM donor WHERE validdate < {} ORDER BY name;".format(current_date))
+    data = c.fetchall()
+    c.close()
+    db_close(db)
+    
+    msg = ''
+    for i, d in enumerate(data):
+        #0=discord_id,1=name,2=startdate,3=validdate
+        if bot_debug == 1:
+            msg += 'Debug: Member {} should be removed now'.format(d[1])
+        else:
+            # lookup the userid, a bit clunky but fastest way.
+            for member in server.members:
+                if member.id == d[0]:
+                   role = discord.utils.get(server.roles, name=donor_role)
+                   yield from client.remove_roles(member, role)
+                   msg += '{} removed from {}\n'.format(member.name, donor_role)
+                   break
 
     yield from client.send_message(message.author, '```' + msg[:1994] + '```')
     if len(msg) >= 1994:
@@ -191,7 +225,7 @@ def payment(message):
                     data = c.fetchall()
                     c.close()
                     db_close(db)
-                    cleanup = []
+
                     msg = '```'
                     msg += 'Payment information for {}\n'.format(discordname)
                     msg += '----------------------\n'
@@ -218,7 +252,7 @@ def payment(message):
       data = c.fetchall()
       c.close()
       db_close(db)
-      cleanup = []
+
       msg = '```'
       msg += 'months'.ljust(12) + 'date\n'
       msg += '----------------------\n'
@@ -336,7 +370,7 @@ def donor(message):
                     db_close(db)
                     if old_valid < created:
                         if bot_debug == 1:
-                            print('Member should be added now')
+                            print('Debug: Member {} should be added now'.format(discordname))
                         else:
                             role = discord.utils.get(server.roles, name=donor_role)
                             yield from client.add_roles(discordmember, role)
@@ -377,7 +411,7 @@ def donor(message):
 
                     if donationadded:
                         if bot_debug == 1:
-                            print('Member should be added now')
+                            print('Debug: Member {} should be added now'.format(discordname))
                         else:
                             role = discord.utils.get(server.roles, name=donor_role)
                             yield from client.add_roles(discordmember, role)
