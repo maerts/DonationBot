@@ -74,6 +74,7 @@ e.g. if today is the 19th of september and you type `!donor nickname 1` it will 
 `!checkdon {user}` find out the expiration for a user. \n\
 `!payment {user}` find out all payments made by a user with the date.\n\
 `!expire` will list all users whose subscription runs out next month.\n\
+`!subs` will list all users in the database with a valid subscription and when it runs out.\n\
 "
 # The message shown for unprivileged users
 noaccessmsg = "Hi I'm a donation bot!\n\
@@ -93,6 +94,8 @@ def on_message(message):
         yield from donor(message)
     if '!expire' == message.content[0:7] and (roleacc(message, 'super') or roleacc(message, 'admin')):
         yield from expire(message)
+    if '!subs' == message.content[0:5] and (roleacc(message, 'super') or roleacc(message, 'admin')):
+        yield from subscribers(message)
     if '!payment' == message.content[0:8]:
         yield from payment(message)
     if '!checkdon' == message.content[0:9]:
@@ -101,6 +104,31 @@ def on_message(message):
 ##################################################
 
 # -- Donor functions --
+# Helper function to get all active subscribers
+def subscribers(message):
+    now = int(time.time())
+    # verify existence of discordid on the server
+    db = db_connect()
+    c = db.cursor()
+    c.execute("SELECT * FROM donor WHERE validdate > {} ORDER BY name;".format(now))
+    data = c.fetchall()
+    c.close()
+    db_close(db)
+    cleanup = []
+    msg = ''
+    msg += 'Active subscribers\n'
+    msg += '\n'
+    msg += 'Name'.ljust(20) + 'Date\n'
+    msg += '----------------------------\n'
+    for i, d in enumerate(data):
+        msg += str(d[1]).ljust(20) + str(datetime.date.fromtimestamp(int(d[3]))) + '\n'
+    
+    yield from client.send_message(message.author, '```' + msg[:1994] + '```')
+    if len(msg) >= 1994:
+        for i in range(1, round(len(msg)/1994) ):
+            c1 = '```'+ msg[i*1994:(i+1)*1994] + '```'
+            yield from client.send_message(message.author, c1)
+
 # Helper function to check your payments
 def expire(message):
     d_valid = datetime.date.fromtimestamp(int(time.time()))
