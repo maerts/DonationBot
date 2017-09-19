@@ -302,6 +302,12 @@ def donor(message):
                     except:
                         db.rollback()
                     db_close(db)
+                    if old_valid < created:
+                        if bot_debug == 1:
+                            print('Member should be added now')
+                        else:
+                            role = discord.utils.get(server.roles, name=donor_role)
+                            yield from client.add_roles(discordmember, role)
                     yield from client.send_message(message.channel, "Added a payment for `{} months` for user `{}` it will expire at `{}`".format(user, discordname, str(datetime.date.fromtimestamp(valid))))
                 else:
                     yield from client.send_message(message.channel, "There was a problem adding a donation for donor `{}`. Contact an admin if this problem persists".format(discordname))
@@ -342,7 +348,7 @@ def donor(message):
                             print('Member should be added now')
                         else:
                             role = discord.utils.get(server.roles, name=donor_role)
-                            await client.add_roles(discordmember, role)
+                            yield from client.add_roles(discordmember, role)
                         yield from client.send_message(message.channel, "Added donor `{}` to the database with a first payment for `{} months`".format(discordname, month))
                     else:
                         yield from client.send_message(message.channel, "There was a problem adding a donation for donor `{}`. Contact an admin if this problem persists".format(user))
