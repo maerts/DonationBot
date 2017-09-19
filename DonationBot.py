@@ -112,6 +112,7 @@ def on_message(message):
 # -- Donor functions --
 # Helper function to get all active subscribers
 def donor_subs(message):
+    # Current time
     now = int(time.time())
     # verify existence of discordid on the server
     db = db_connect()
@@ -121,6 +122,7 @@ def donor_subs(message):
     c.close()
     db_close(db)
 
+    # Build the list of subs
     msg = ''
     msg += 'Active subscribers\n'
     msg += '\n'
@@ -137,6 +139,7 @@ def donor_subs(message):
 
 # Helper function to check your expiring members' subs
 def donor_expiration(message):
+    # Get the last day of this month.
     d_valid = datetime.date.fromtimestamp(int(time.time()))
     d_new_valid = d_valid + relativedelta(day=1, months=+1, days=-1)
     next_month = int(time.mktime(d_new_valid.timetuple()))
@@ -148,6 +151,7 @@ def donor_expiration(message):
     c.close()
     db_close(db)
 
+    # Build the list of expiring subs
     msg = ''
     msg += 'The following members\' subscription will expire at the end of this month\n'
     msg += '\n'
@@ -197,8 +201,10 @@ def donor_clean(message):
 # Helper function to check contributions
 def donor_contrib(message):
     server = client.get_server(discord_server)
+    # Get all parameters
     smsg = message.content.lower().split()
     if len(smsg) == 3:
+        # Only admins can pass parameters to this function.
         if (roleacc(message, 'super') or roleacc(message, 'admin')):
             user = smsg[2]
             discordid = None
