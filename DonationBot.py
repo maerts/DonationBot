@@ -142,15 +142,19 @@ def expire(message):
     c.close()
     db_close(db)
     cleanup = []
-    msg = '```'
+    msg = ''
     msg += 'The following members\' subscription will expire at the end of this month\n'
     msg += '\n'
     msg += 'name\n'
     msg += '----\n'
     for i, d in enumerate(data):
         msg += str(d[1]).ljust(20) + '\n'
-    msg += '```'
-    yield from client.send_message(message.channel, msg)
+
+    yield from client.send_message(message.author, '```' + msg[:1994] + '```')
+    if len(msg) >= 1994:
+        for i in range(1, round(len(msg)/1994) ):
+            c1 = '```'+ msg[i*1994:(i+1)*1994] + '```'
+            yield from client.send_message(message.author, c1)
 
 # Helper function to check your payments
 def payment(message):
