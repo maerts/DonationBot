@@ -60,54 +60,58 @@ def on_ready():
 helpmsg = "\n\
 Commands\n\
 \n\
-`!checkdon` if you have donated and are process by the system you can check until when you're a donor. Donate before the expiration date to continue your subscription. \n\
-`!payment` list all payments made in your name. \n\
+`!donor expire` if you have donated and are process by the system you can check until when you're a donor. Donate before the expiration date to continue your subscription. \n\
+`!donor contrib` list all the months added in your name. \n\
 "
 
 # The !help message for admin users
 helpamsg = "\n\n\
 Admin commands\n\
 \n\
-`!donor {user} {number}` this will add a new user and a payment or add a payment and update the valid date on a donor.\n\
+`!donor add {user} {#months}` this will add a new user and a contribution or add a contribution and update the valid date on a donor.\n\
 If today is not the 25th of the month or later, it will count as a donation for this month, if it is made after it will start counting from next month.\n\
 e.g. if today is the 19th of september and you type `!donor nickname 1` it will count towards the end of september. If it is the 25th of September it will count towards the end of October.\n\
-`!checkdon {user}` find out the expiration for a user. \n\
-`!payment {user}` find out all payments made by a user with the date.\n\
-`!expire` will list all users whose subscription runs out next month.\n\
-`!subs` will list all users in the database with a valid subscription and when it runs out.\n\
+`!donor expire {user}` find out the expiration for a user. \n\
+`!donor contrib {user}` find out all months added to a user with the date.\n\
+`!donor subs` will list all users in the database with a valid subscription and when it runs out.\n\
+`!donor expiration` will list all users whose subscription runs out next month.\n\
 "
 # The message shown for unprivileged users
-noaccessmsg = "Hi I'm a donation bot!\n\
+helpsamsg = "\n\n\
+Super Admin commands\n\
 \n\
-Unfortunately you do not have the proper permissions to use me, read #announcements for more information on how to donate to get access."
+`!donor clean` remove all the Donor role from expired contributors.\n\
+"
 # --- End help messages ---
 
 @client.async_event
 def on_message(message):
     if message.channel.is_private:
-        if '!aid' == message.content[0:5]:
+        if '!donor help' == message.content[0:11]:
             returnmsg = helpmsg
             if roleacc(message, 'super') or roleacc(message, 'admin'):
                 returnmsg += helpamsg
+            if roleacc(message, 'super'):
+                returnmsg += helpsamsg
             yield from client.send_message(message.channel, returnmsg)
-    if '!donor' == message.content[0:6] and (roleacc(message, 'super') or roleacc(message, 'admin')):
-        yield from donor(message)
-    if '!expire' == message.content[0:7] and (roleacc(message, 'super') or roleacc(message, 'admin')):
-        yield from expire(message)
-    if '!subs' == message.content[0:5] and (roleacc(message, 'super') or roleacc(message, 'admin')):
-        yield from subscribers(message)
-    if '!subprocess' == message.content[0:5] and roleacc(message, 'super'):
-        yield from subprocess(message)
-    if '!payment' == message.content[0:8]:
-        yield from payment(message)
-    if '!checkdon' == message.content[0:9]:
-        yield from checkdon(message)
+    if '!donor add' == message.content[0:10] and (roleacc(message, 'super') or roleacc(message, 'admin')):
+        yield from donor_add(message)
+    if '!donor expiration' == message.content[0:17] and (roleacc(message, 'super') or roleacc(message, 'admin')):
+        yield from donor_expiration(message)
+    if '!donor subs' == message.content[0:11] and (roleacc(message, 'super') or roleacc(message, 'admin')):
+        yield from donor_subs(message)
+    if '!donor clean' == message.content[0:12] and roleacc(message, 'super'):
+        yield from donor_clean(message)
+    if '!donor contrib' == message.content[0:14]:
+        yield from donor_contrib(message)
+    if '!donor expire' == message.content[0:13]:
+        yield from donor_expire(message)
 
 ##################################################
 
 # -- Donor functions --
 # Helper function to get all active subscribers
-def subscribers(message):
+def donor_subs(message):
     now = int(time.time())
     # verify existence of discordid on the server
     db = db_connect()
@@ -131,8 +135,8 @@ def subscribers(message):
             c1 = '```'+ msg[i*1994:(i+1)*1994] + '```'
             yield from client.send_message(message.author, c1)
 
-# Helper function to check your payments
-def expire(message):
+# Helper function to check your expiring members' subs
+def donor_expiration(message):
     d_valid = datetime.date.fromtimestamp(int(time.time()))
     d_new_valid = d_valid + relativedelta(day=1, months=+1, days=-1)
     next_month = int(time.mktime(d_new_valid.timetuple()))
@@ -158,8 +162,8 @@ def expire(message):
             c1 = '```'+ msg[i*1994:(i+1)*1994] + '```'
             yield from client.send_message(message.author, c1)
             
-# Helper function to check your payments
-def subprocess(message):
+# Helper function to remove roles from expired subscriptions
+def donor_clean(message):
     current_date = int(time.time())
 
     # verify existence of discordid on the server
@@ -169,7 +173,7 @@ def subprocess(message):
     data = c.fetchall()
     c.close()
     db_close(db)
-    
+
     msg = ''
     for i, d in enumerate(data):
         #0=discord_id,1=name,2=startdate,3=validdate
@@ -190,13 +194,13 @@ def subprocess(message):
             c1 = '```'+ msg[i*1994:(i+1)*1994] + '```'
             yield from client.send_message(message.author, c1)
 
-# Helper function to check your payments
-def payment(message):
+# Helper function to check contributions
+def donor_contrib(message):
     server = client.get_server(discord_server)
-    msg = message.content.lower().split()
-    if len(msg) == 2:
+    smsg = message.content.lower().split()
+    if len(smsg) == 3:
         if (roleacc(message, 'super') or roleacc(message, 'admin')):
-            user = msg[1]
+            user = smsg[2]
             discordid = None
             discordname = ""
             # lookup the userid, a bit clunky but fastest way.
@@ -214,9 +218,9 @@ def payment(message):
                 c.close()
                 db_close(db)
                 if row is None:
-                    yield from client.send_message(message.channel, "Payment information for member `{}` can't be found in the system.".format(discordname))                
+                    yield from client.send_message(message.channel, "Contribution information for member `{}` can't be found in the system.".format(discordname))                
                 else:
-                    startdate = str(datetime.date.fromtimestamp(int(row[3])))
+                    startdate = str(datetime.date.fromtimestamp(int(row[2])))
                     validdate = str(datetime.date.fromtimestamp(int(row[3])))
                     # verify existence of rol on the server
                     db = db_connect()
@@ -227,7 +231,7 @@ def payment(message):
                     db_close(db)
 
                     msg = '```'
-                    msg += 'Payment information for {}\n'.format(discordname)
+                    msg += 'Contribution information for {}\n'.format(discordname)
                     msg += '----------------------\n'
                     msg += 'Added date:'.ljust(12) + startdate + '\n'
                     msg += 'Valid date:'.ljust(12) + validdate + '\n'
@@ -263,12 +267,12 @@ def payment(message):
       yield from client.send_message(message.channel, msg)
 
 # Helper function to check your donation expiration
-def checkdon(message):
+def donor_expire(message):
     server = client.get_server(discord_server)
     msg = message.content.lower().split()
-    if len(msg) == 2:
+    if len(msg) == 3:
         if (roleacc(message, 'super') or roleacc(message, 'admin')):
-            user = msg[1]
+            user = msg[2]
             discordid = None
             discordname = ""
             # lookup the userid, a bit clunky but fastest way.
@@ -310,17 +314,17 @@ def checkdon(message):
           yield from client.send_message(message.channel, "Unfortunately you are not known in the system, please contact a moderator if you have donated.")
 
 # Function to add monitored channels to the database
-def donor(message):
+def donor_add(message):
     server = client.get_server(discord_server)
     msg = message.content.lower().split()
-    if len(msg) < 3:
+    if len(msg) < 4:
         yield from client.send_message(message.channel, "You are missing a parameter to the command, please verify and retry.")
     else:
         # instance of server for later use
         server = client.get_server(discord_server)
         # We expect these values.
-        user = msg[1]
-        month = msg[2]
+        user = msg[2]
+        month = msg[3]
 
         discordid = None
         discordname = ""
@@ -374,7 +378,7 @@ def donor(message):
                         else:
                             role = discord.utils.get(server.roles, name=donor_role)
                             yield from client.add_roles(discordmember, role)
-                    yield from client.send_message(message.channel, "Added a payment for `{} months` for user `{}` it will expire at `{}`".format(user, discordname, str(datetime.date.fromtimestamp(valid))))
+                    yield from client.send_message(message.channel, "Added a contribution for `{} months` for user `{}` it will expire at `{}`".format(user, discordname, str(datetime.date.fromtimestamp(valid))))
                 else:
                     yield from client.send_message(message.channel, "There was a problem adding a donation for donor `{}`. Contact an admin if this problem persists".format(discordname))
             # If the donor doesn't exist, create a new entry for the donors, calculate the validity & add a payment
@@ -415,7 +419,7 @@ def donor(message):
                         else:
                             role = discord.utils.get(server.roles, name=donor_role)
                             yield from client.add_roles(discordmember, role)
-                        yield from client.send_message(message.channel, "Added donor `{}` to the database with a first payment for `{} months`".format(discordname, month))
+                        yield from client.send_message(message.channel, "Added donor `{}` to the database with a first contribution for `{} months`".format(discordname, month))
                     else:
                         yield from client.send_message(message.channel, "There was a problem adding a donation for donor `{}`. Contact an admin if this problem persists".format(user))
                 else:
