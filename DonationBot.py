@@ -188,10 +188,13 @@ def donor_clean(message):
             # lookup the userid, a bit clunky but fastest way.
             for member in server.members:
                 if member.id == d[0]:
-                   role = discord.utils.get(server.roles, name=donor_role)
-                   yield from client.remove_roles(member, role)
-                   msg += '{} removed from {}\n'.format(member.name, donor_role)
-                   break
+                    try:
+                        role = discord.utils.get(server.roles, name=donor_role)
+                        yield from client.remove_roles(member, role)
+                        msg += '- {} removed from {}\n'.format(member.name, donor_role)
+                    except:
+                        msg += '# An error occured try to remove {} removed from {}\n'.format(member.name, donor_role)
+                    break
 
     yield from client.send_message(message.author, '```' + msg[:1994] + '```')
     if len(msg) >= 1994:
@@ -387,8 +390,11 @@ def donor_add(message):
                         if bot_debug == 1:
                             print('Debug: Member {} should be added now'.format(discordname))
                         else:
-                            role = discord.utils.get(server.roles, name=donor_role)
-                            yield from client.add_roles(discordmember, role)
+                            try:
+                                role = discord.utils.get(server.roles, name=donor_role)
+                                yield from client.add_roles(discordmember, role)
+                            except:
+                                yield from client.send_message(message.channel, "There was an error trying to add `{}` to the `{}`.".format(discordname, donor_role))
                     yield from client.send_message(message.channel, "Added a contribution for `{} months` for user `{}` it will expire at `{}`".format(user, discordname, str(datetime.date.fromtimestamp(valid))))
                 else:
                     yield from client.send_message(message.channel, "There was a problem adding a donation for donor `{}`. Contact an admin if this problem persists".format(discordname))
@@ -428,8 +434,11 @@ def donor_add(message):
                         if bot_debug == 1:
                             print('Debug: Member {} should be added now'.format(discordname))
                         else:
-                            role = discord.utils.get(server.roles, name=donor_role)
-                            yield from client.add_roles(discordmember, role)
+                            try:
+                                role = discord.utils.get(server.roles, name=donor_role)
+                                yield from client.add_roles(discordmember, role)
+                            except:
+                                yield from client.send_message(message.channel, "There was an error trying to add `{}` to the `{}`.".format(discordname, donor_role))
                         yield from client.send_message(message.channel, "Added donor `{}` to the database with a first contribution for `{} months`".format(discordname, month))
                     else:
                         yield from client.send_message(message.channel, "There was a problem adding a donation for donor `{}`. Contact an admin if this problem persists".format(user))
@@ -512,6 +521,7 @@ def roleacc(message, group):
             return stopUnauth
     return stopUnauth
 
+# Helper function to get the correct member
 def user_lookup(member, user):
 
     return str(member.name).lower() == user.lower() or str(member.name + '#' + member.discriminator).lower() == user or member.id == user or str(member.nick).lower() == user.lower()
