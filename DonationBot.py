@@ -212,7 +212,7 @@ def donor_contrib(message):
             discordname = ""
             # lookup the userid, a bit clunky but fastest way.
             for member in server.members:
-                if member.name == user or (member.name + '#' + member.discriminator) == user or member.id == user:
+                if user_lookup(member, user):
                    discordid = member.id
                    discordname = member.name
                    break
@@ -288,7 +288,7 @@ def donor_expire(message):
             discordname = ""
             # lookup the userid, a bit clunky but fastest way.
             for member in server.members:
-                if member.name == user or (member.name + '#' + member.discriminator) == user or member.id == user:
+                if user_lookup(member, user):
                    discordid = member.id
                    discordname = member.name
                    break
@@ -342,7 +342,7 @@ def donor_add(message):
         discordmember = None
         # lookup the userid, a bit clunky but fastest way.
         for member in server.members:
-            if member.name == user or (member.name + '#' + member.discriminator) == user or member.id == user:
+            if user_lookup(member, user):
                discordid = member.id
                discordname = member.name
                discordmember = member
@@ -511,6 +511,10 @@ def roleacc(message, group):
                  break         
             return stopUnauth
     return stopUnauth
+
+def user_lookup(member, user):
+
+    return str(member.name).lower() == user.lower() or str(member.name + '#' + member.discriminator).lower() == user or member.id == user or str(member.nick).lower() == user.lower()
 
 # --- db functions ---
 # Helper function to execute a query and return the results in a list object
