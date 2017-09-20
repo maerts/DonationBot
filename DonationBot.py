@@ -74,7 +74,7 @@ e.g. if today is the 19th of september and you type `!donor add nickname 1` it w
 `!donor expire {user}` find out the expiration for a user. \n\
 `!donor contrib {user}` find out all months added to a user with the date.\n\
 `!donor subs` will list all users in the database with a valid subscription and when it runs out.\n\
-`!donor expiration` will list all users whose subscription runs out next month.\n\
+`!donor expiration` will list all users whose subscription runs out at the end of this month.\n\
 "
 # The message shown for unprivileged users
 helpsamsg = "\n\n\
@@ -158,6 +158,7 @@ def donor_expiration(message):
     msg += 'name\n'
     msg += '----\n'
     for i, d in enumerate(data):
+        
         msg += str(d[1]).ljust(20) + '\n'
 
     yield from client.send_message(message.author, '```' + msg[:1994] + '```')
@@ -260,14 +261,18 @@ def donor_contrib(message):
       c = db.cursor()
       c.execute("SELECT * FROM donation WHERE discord_id = '{}' ORDER BY id DESC;".format(discordid))
       data = c.fetchall()
+      rc = c.rowcount
       c.close()
       db_close(db)
 
       msg = '```'
-      msg += 'months'.ljust(12) + 'date\n'
-      msg += '----------------------\n'
-      for i, d in enumerate(data):
-          msg += str(d[2]).ljust(12) + str(datetime.date.fromtimestamp(int(d[3]))) + '\n'
+      if rc > 0:
+          msg += 'months'.ljust(12) + 'date\n'
+          msg += '----------------------\n'
+          for i, d in enumerate(data):
+              msg += str(d[2]).ljust(12) + str(datetime.date.fromtimestamp(int(d[3]))) + '\n'
+      else:
+          msg+= 'There is no contribution information for your user'
       msg += '```'
       
       yield from client.send_message(message.channel, msg)
