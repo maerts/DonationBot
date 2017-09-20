@@ -7,8 +7,10 @@ import configparser
 import traceback
 import MySQLdb
 import datetime
+import gc
 from datetime import date, timedelta
 from dateutil.relativedelta import relativedelta
+from time import sleep
 
 ## Get configuration from ini file
 ## No validation on its presence, so make sure these are present
@@ -75,6 +77,7 @@ e.g. if today is the 19th of september and you type `!donor add nickname 1` it w
 `!donor contrib {user}` find out all months added to a user with the date.\n\
 `!donor subs` will list all users in the database with a valid subscription and when it runs out.\n\
 `!donor expiration` will list all users whose subscription runs out at the end of this month.\n\
+`!donor freeloader` will list all users whose subscription has run out but that still have the Donor role.\n\
 "
 # The message shown for unprivileged users
 helpsamsg = "\n\n\
@@ -106,6 +109,8 @@ def on_message(message):
         yield from donor_contrib(message)
     if '!donor expire' == message.content[0:13]:
         yield from donor_expire(message)
+    if '!donor freeloader' == message.content[0:17] and (roleacc(message, 'super') or roleacc(message, 'admin')):
+        yield from donor_freeloader(message)
 
 ##################################################
 
@@ -130,13 +135,64 @@ def donor_subs(message):
     msg += '----------------------------\n'
     for i, d in enumerate(data):
         msg += str(d[1]).ljust(20) + str(datetime.date.fromtimestamp(int(d[3]))) + '\n'
-    
+
     yield from client.send_message(message.author, '```' + msg[:1994] + '```')
     if len(msg) >= 1994:
         for i in range(1, round(len(msg)/1994) ):
             c1 = '```'+ msg[i*1994:(i+1)*1994] + '```'
             yield from client.send_message(message.author, c1)
 
+# Helper function to check your expiring members' subs
+def donor_freeloader(message):
+    server = client.get_server(discord_server)
+    # Get the last day of this month.
+    d_valid = int(time.time())
+    # verify existence of discordid on the server
+    db = db_connect()
+    c = db.cursor()
+    c.execute("SELECT * FROM donor WHERE validdate > {} ORDER BY name;".format(d_valid))
+    data = c.fetchall()
+    c.close()
+    db_close(db)
+    
+    valid = []
+    for i, d in enumerate(data):
+        valid.append(d[0])
+
+    db = db_connect()
+    c = db.cursor()
+    c.execute("SELECT * FROM donor WHERE validdate < {} ORDER BY name;".format(d_valid))
+    data = c.fetchall()
+    c.close()
+    db_close(db)
+    
+    expired = {}
+    for i, d in enumerate(data):
+        expired[d[0]] = str(datetime.date.fromtimestamp(int(d[3])))
+
+        
+    # Build the list of expiring subs
+    msg = ''
+    msg += 'The following members\' subscription has expired \n'
+    msg += '\n'
+    msg += 'name'.ljust(35) + 'expired\n'
+    msg += ''.ljust(42, '-') + '\n'
+    for member in server.members:
+        if str(member.top_role) == donor_role and member.id not in valid:
+            expired_date = 'Not in bot'
+            if member.id in expired.keys():
+                expired_date = expired[member.id]
+            msg += str(member.name).ljust(35) + expired_date + '\n'
+        
+    yield from client.send_message(message.author, '```' + msg[:1800] + '```')
+    if len(msg) >= 1800:
+        for i in range(1, round(len(msg)/1800) ):
+            # delay a quarter second to prevent flood-bans
+            sleep(0.25)
+            c1 = '```'+ msg[i*1800:(i+1)*1800] + '```'
+            yield from client.send_message(message.author, c1)
+
+            
 # Helper function to check your expiring members' subs
 def donor_expiration(message):
     # Get the last day of this month.
