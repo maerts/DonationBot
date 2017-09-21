@@ -188,7 +188,7 @@ def donor_freeloader(message):
     if len(msg) >= 1800:
         for i in range(1, round(len(msg)/1800) ):
             # delay a quarter second to prevent flood-bans
-            sleep(0.25)
+            sleep(0.50)
             c1 = '```'+ msg[i*1800:(i+1)*1800] + '```'
             yield from client.send_message(message.author, c1)
 
@@ -431,6 +431,7 @@ def donor_add(message):
                 except MySQLdb.Error as e:
                     db.rollback()
                     print(str(e))
+                c.close()
                 db_close(db)
 
                 if donationadded:
@@ -441,6 +442,7 @@ def donor_add(message):
                         db.commit() 
                     except:
                         db.rollback()
+                    c.close()
                     db_close(db)
                     if old_valid < created:
                         if bot_debug == 1:
@@ -469,7 +471,7 @@ def donor_add(message):
                 except MySQLdb.Error as e:
                     db.rollback()
                     print(str(e))
-
+                c.close()
                 db_close(db)
                 
                 if donoradded:
@@ -483,7 +485,7 @@ def donor_add(message):
                     except MySQLdb.Error as e:
                         db.rollback()
                         print(str(e))
-
+                    c.close()
                     db_close(db)
 
                     if donationadded:
