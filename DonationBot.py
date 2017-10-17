@@ -457,20 +457,19 @@ def donor_change(message):
                         db.rollback()
                     c.close()
                     db_close(db)
-
-                        if bot_debug == 1:
-                            watchdog('Debug: Member {} updated to {}'.format(omember.name, nmember.name))
-                        else:
-                            try:
-                                # Remove roles from old user
-                                role = discord.utils.get(server.roles, name=donor_role)
-                                yield from client.remove_roles(discordmember, role)
-                                
-                                # Add roles to new user
-                                role = discord.utils.get(server.roles, name=donor_role)
-                                yield from client.add_roles(nmember, role)
-                            except:
-                                yield from client.send_message(message.channel, "There was an error trying to update member subscription from `{}` to `{}`.".format(omember.name, nmember.name))
+                    if bot_debug == 1:
+                        watchdog('Debug: Member {} updated to {}'.format(omember.name, nmember.name))
+                    else:
+                        try:
+                            # Remove roles from old user
+                            role = discord.utils.get(server.roles, name=donor_role)
+                            yield from client.remove_roles(discordmember, role)
+                            
+                            # Add roles to new user
+                            role = discord.utils.get(server.roles, name=donor_role)
+                            yield from client.add_roles(nmember, role)
+                        except:
+                            yield from client.send_message(message.channel, "There was an error trying to update member subscription from `{}` to `{}`.".format(omember.name, nmember.name))
                     yield from client.send_message(message.channel, "Updated member subscription from `{}` to `{}`.".format(omember.name, nmember.name))
                 else:
                     yield from client.send_message(message.channel, "There was a problem adding a donation for donor `{}`. Contact an admin if this problem persists".format(discordname))
