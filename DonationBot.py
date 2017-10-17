@@ -125,25 +125,26 @@ def donor_subs(message):
     # verify existence of discordid on the server
     db = db_connect()
     c = db.cursor()
-    c.execute("SELECT * FROM donor WHERE validdate > {} ORDER BY name;".format(now))
+    c.execute("SELECT * FROM donor WHERE validdate > {} ORDER BY validdate ASC, name;".format(now))
     data = c.fetchall()
     c.close()
     db_close(db)
 
     # Build the list of subs
-    msg = ''
+    msg = '```'
     msg += 'Active subscribers\n'
     msg += '\n'
-    msg += 'Name'.ljust(20) + 'Date\n'
-    msg += '----------------------------\n'
+    msg += 'Name'.ljust(40) + 'Date'.ljust(20) + 'discord_id\n'
+    msg += '\n'.rjust(95, '-')
     for i, d in enumerate(data):
-        msg += str(d[1]).ljust(20) + str(datetime.date.fromtimestamp(int(d[3]))) + '\n'
-
-    yield from client.send_message(message.author, '```' + msg[:1994] + '```')
-    if len(msg) >= 1994:
-        for i in range(1, round(len(msg)/1994) ):
-            c1 = '```'+ msg[i*1994:(i+1)*1994] + '```'
-            yield from client.send_message(message.author, c1)
+        tmp = str(d[1]).ljust(40) + str(datetime.date.fromtimestamp(int(d[3]))).ljust(20) + str(d[0]) + '\n'
+        if (len(tmp) + len(msg)) >  1997:
+            msg += '```'
+            yield from client.send_message(message.author, msg)
+            msg = '```'
+        msg += tmp
+    msg += '```'
+    yield from client.send_message(message.author, msg)
 
 # Helper function to check your expiring members' subs
 def donor_freeloader(message):
@@ -175,25 +176,28 @@ def donor_freeloader(message):
 
         
     # Build the list of expiring subs
-    msg = ''
+    msg = '```'
     msg += 'The following members\' subscription has expired \n'
     msg += '\n'
-    msg += 'name'.ljust(35) + 'expired\n'
+    msg += 'name'.ljust(50) + 'expired\n'
     msg += ''.ljust(42, '-') + '\n'
     for member in server.members:
-        if str(member.top_role) == donor_role and member.id not in valid:
+        if member.top_role == donor_role and int(member.id) not in valid:
             expired_date = 'Not in bot'
             if member.id in expired.keys():
                 expired_date = expired[member.id]
-            msg += str(member.name).ljust(35) + expired_date + '\n'
-        
-    yield from client.send_message(message.author, '```' + msg[:1800] + '```')
-    if len(msg) >= 1800:
-        for i in range(1, round(len(msg)/1800) ):
-            # delay a quarter second to prevent flood-bans
-            sleep(0.50)
-            c1 = '```'+ msg[i*1800:(i+1)*1800] + '```'
-            yield from client.send_message(message.author, c1)
+            name = member.name
+            if member.name == '':
+                name = str(member.id)
+            tmp = str(name).ljust(50) + expired_date + '\n'
+            if (len(tmp) + len(msg)) >  1997:
+                msg += '```'
+                yield from client.send_message(message.author, msg)
+                msg = '```'
+            msg += tmp
+    msg += '```'
+    yield from client.send_message(message.author, msg)
+
 
             
 # Helper function to check your expiring members' subs
@@ -211,20 +215,20 @@ def donor_expiration(message):
     db_close(db)
 
     # Build the list of expiring subs
-    msg = ''
+    msg = '```'
     msg += 'The following members\' subscription will expire at the end of this month\n'
     msg += '\n'
-    msg += 'name\n'
+    msg += 'name'.ljust(35) + 'id\n'
     msg += '----\n'
     for i, d in enumerate(data):
-        
-        msg += str(d[1]).ljust(20) + '\n'
-
-    yield from client.send_message(message.author, '```' + msg[:1994] + '```')
-    if len(msg) >= 1994:
-        for i in range(1, round(len(msg)/1994) ):
-            c1 = '```'+ msg[i*1994:(i+1)*1994] + '```'
-            yield from client.send_message(message.author, c1)
+        tmp = str(d[1]).ljust(35) + str(d[0]) + '\n'
+        if (len(tmp) + len(msg)) >  1997:
+            msg += '```'
+            yield from client.send_message(message.author, msg)
+            msg = '```'
+        msg += tmp
+    msg += '```'
+    yield from client.send_message(message.author, msg)
             
 # Helper function to remove roles from expired subscriptions
 def donor_clean(message):
@@ -238,11 +242,14 @@ def donor_clean(message):
     c.close()
     db_close(db)
 
-    msg = ''
+    msg = '```'
+    msg += 'Coroutine to remove the donor role from expired members\n'
+    msg += ''.ljust(55, '-') + '\n'
     for i, d in enumerate(data):
         #0=discord_id,1=name,2=startdate,3=validdate
+        tmp = ""
         if bot_debug == 1:
-            msg += 'Debug: Member {} should be removed now'.format(d[1])
+            tmp = 'Debug: Member {} should be removed now.\n'.format(d[1])
         else:
             # lookup the userid, a bit clunky but fastest way.
             for member in server.members:
@@ -250,16 +257,17 @@ def donor_clean(message):
                     try:
                         role = discord.utils.get(server.roles, name=donor_role)
                         yield from client.remove_roles(member, role)
-                        msg += '- {} removed from {}\n'.format(member.name, donor_role)
+                        tmp = '- {} removed from {}\n'.format(member.name, donor_role)
                     except:
-                        msg += '# An error occured try to remove {} removed from {}\n'.format(member.name, donor_role)
+                        tmp = '# An error occured try to remove {} removed from {}\n'.format(member.name, donor_role)
                     break
-
-    yield from client.send_message(message.author, '```' + msg[:1994] + '```')
-    if len(msg) >= 1994:
-        for i in range(1, round(len(msg)/1994) ):
-            c1 = '```'+ msg[i*1994:(i+1)*1994] + '```'
-            yield from client.send_message(message.author, c1)
+                if (len(tmp) + len(msg)) >  1997:
+                    msg += '```'
+                    yield from client.send_message(message.author, msg)
+                    msg = '```'
+                msg += tmp
+    msg += '```'
+    yield from client.send_message(message.author, msg)
 
 # Helper function to check contributions
 def donor_contrib(message):
@@ -549,7 +557,7 @@ def donor_add(message):
                                 yield from client.add_roles(discordmember, role)
                             except:
                                 yield from client.send_message(message.channel, "There was an error trying to add `{}` to the `{}`.".format(discordname, donor_role))
-                    yield from client.send_message(message.channel, "Added a contribution for `{} months` for user `{}` it will expire at `{}`".format(user, discordname, str(datetime.date.fromtimestamp(valid))))
+                    yield from client.send_message(message.channel, "Added a contribution for `{} months` for user `{}` it will expire at `{}`".format(month, discordname, str(datetime.date.fromtimestamp(valid))))
                 else:
                     yield from client.send_message(message.channel, "There was a problem adding a donation for donor `{}`. Contact an admin if this problem persists".format(discordname))
             # If the donor doesn't exist, create a new entry for the donors, calculate the validity & add a payment
