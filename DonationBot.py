@@ -48,13 +48,13 @@ def on_member_join(member):
 
 @client.async_event
 def on_ready():
-    print('Connected! Ready to notify.')
-    print('Username: ' + client.user.name)
-    print('ID: ' + client.user.id)
-    print('--Server List--')
+    watchdog('Connected! Ready to notify.')
+    watchdog('Username: ' + client.user.name)
+    watchdog('ID: ' + client.user.id)
+    watchdog('--Server List--')
     for server in client.servers:
         discord_server = server.id
-        print(server.id + ': ' + server.name)
+        watchdog(server.id + ': ' + server.name)
     
 
 # --- Help messages ---
@@ -75,6 +75,7 @@ If today is not the 25th of the month or later, it will count as a donation for 
 e.g. if today is the 19th of september and you type `!donor add nickname 1` it will count towards the end of september. If it is the 25th of September it will count towards the end of October.\n\
 `!donor expire {user}` find out the expiration for a user. \n\
 `!donor contrib {user}` find out all months added to a user with the date.\n\
+`!donor change {olduser} {newuser}` update a user that already .\n\
 `!donor subs` will list all users in the database with a valid subscription and when it runs out.\n\
 `!donor expiration` will list all users whose subscription runs out at the end of this month.\n\
 `!donor freeloader` will list all users whose subscription has run out but that still have the Donor role.\n\
@@ -107,7 +108,9 @@ def on_message(message):
         yield from donor_clean(message)
     if '!donor contrib' == message.content[0:14]:
         yield from donor_contrib(message)
-    if '!donor expire' == message.content[0:13]:
+    if '!donor change' == message.content[0:13]:
+        yield from donor_change(message)
+    if '!donor expire' == message.content[0:13] and (roleacc(message, 'super') or roleacc(message, 'admin')):
         yield from donor_expire(message)
     if '!donor freeloader' == message.content[0:17] and (roleacc(message, 'super') or roleacc(message, 'admin')):
         yield from donor_freeloader(message)
@@ -197,7 +200,7 @@ def donor_freeloader(message):
 def donor_expiration(message):
     # Get the last day of this month.
     d_valid = datetime.date.fromtimestamp(int(time.time()))
-    d_new_valid = d_valid + relativedelta(day=1, months=+1, days=-1)
+    d_new_valid = d_valid + relativedelta(day=31)
     next_month = int(time.mktime(d_new_valid.timetuple()))
     # verify existence of discordid on the server
     db = db_connect()
@@ -383,6 +386,100 @@ def donor_expire(message):
       else:
           yield from client.send_message(message.channel, "Unfortunately you are not known in the system, please contact a moderator if you have donated.")
 
+# Function to change a donor account to a new account
+def donor_change(message):
+    server = client.get_server(discord_server)
+    msg = message.content.lower().split()
+    if len(msg) < 4:
+        yield from client.send_message(message.channel, "You are missing a parameter to the command, please verify and retry.")
+    else:
+        # instance of server for later use
+        server = client.get_server(discord_server)
+        # We expect these values.
+        user = msg[2]
+        newuser = msg[3]
+        if user == newuser:
+            yield from client.send_message(message.channel, "Both ID's must be different from eachother.")
+            return
+        # Member objects for later use
+        omember = None
+        nmember = None
+        
+        # discordid
+        odiscordid = None
+        ndiscordid = None
+        # lookup the userid, a bit clunky but fastest way.
+        for member in server.members:
+            if user_lookup(member, user):
+               odiscordid = member.id
+               omember = member
+            if user_lookup(member, newuser):
+               ndiscordid = member.id
+               nmember = member
+            if odiscordid is not None and ndiscordid is not None:
+               break
+
+        if odiscordid is not None and ndiscordid is not None:
+            # verify existence of rol on the server
+            db = db_connect()
+            c = db.cursor()
+            c.execute("SELECT init, discord_id FROM donor WHERE discord_id = '{}';".format(odiscordid))
+            row = c.fetchone()
+            c.close()
+            db_close(db)
+
+            # If the donor exists, add a payment & update the validity
+            if row is not None:
+                now = int(time.time())
+                init = row[0] if row[0] != 0 else odiscordid
+                oldmember = row[1]
+
+                db = db_connect()
+                c = db.cursor()
+                historyadded = False
+                try:
+                    c.execute("""INSERT INTO history (init, discord_id, updated) VALUES (%s, %s, %s)""", (init, oldmember, now))
+                    db.commit()
+                    historyadded = True
+                except MySQLdb.Error as e:
+                    db.rollback()
+                    watchdog(str(e))
+                c.close()
+                db_close(db)
+
+                if historyadded:
+                    db = db_connect()
+                    c = db.cursor()
+                    try:
+                        c.execute ("""UPDATE donor SET discord_id=%s, init=%s WHERE discord_id=%s""", (ndiscordid, init, oldmember))
+                        db.commit() 
+                    except:
+                        db.rollback()
+                    c.close()
+                    db_close(db)
+
+                        if bot_debug == 1:
+                            watchdog('Debug: Member {} updated to {}'.format(omember.name, nmember.name))
+                        else:
+                            try:
+                                # Remove roles from old user
+                                role = discord.utils.get(server.roles, name=donor_role)
+                                yield from client.remove_roles(discordmember, role)
+                                
+                                # Add roles to new user
+                                role = discord.utils.get(server.roles, name=donor_role)
+                                yield from client.add_roles(nmember, role)
+                            except:
+                                yield from client.send_message(message.channel, "There was an error trying to update member subscription from `{}` to `{}`.".format(omember.name, nmember.name))
+                    yield from client.send_message(message.channel, "Updated member subscription from `{}` to `{}`.".format(omember.name, nmember.name))
+                else:
+                    yield from client.send_message(message.channel, "There was a problem adding a donation for donor `{}`. Contact an admin if this problem persists".format(discordname))
+            # If the donor doesn't exist, create a new entry for the donors, calculate the validity & add a payment
+            else:
+                yield from client.send_message(message.channel, "This user you're trying to change isn't a donor yet, try adding the user through the `add` command".format(user))
+        else:
+            yield from client.send_message(message.channel, "One of the users couldn't be found, try again with different parameters".format(user))
+          
 # Function to add monitored channels to the database
 def donor_add(message):
     server = client.get_server(discord_server)
@@ -430,7 +527,7 @@ def donor_add(message):
                     donationadded = True
                 except MySQLdb.Error as e:
                     db.rollback()
-                    print(str(e))
+                    watchdog(str(e))
                 c.close()
                 db_close(db)
 
@@ -446,7 +543,7 @@ def donor_add(message):
                     db_close(db)
                     if old_valid < created:
                         if bot_debug == 1:
-                            print('Debug: Member {} should be added now'.format(discordname))
+                            watchdog('Debug: Member {} should be added now'.format(discordname))
                         else:
                             try:
                                 role = discord.utils.get(server.roles, name=donor_role)
@@ -470,7 +567,7 @@ def donor_add(message):
                     donoradded = True
                 except MySQLdb.Error as e:
                     db.rollback()
-                    print(str(e))
+                    watchdog(str(e))
                 c.close()
                 db_close(db)
                 
@@ -484,13 +581,13 @@ def donor_add(message):
                         donationadded = True
                     except MySQLdb.Error as e:
                         db.rollback()
-                        print(str(e))
+                        watchdog(str(e))
                     c.close()
                     db_close(db)
 
                     if donationadded:
                         if bot_debug == 1:
-                            print('Debug: Member {} should be added now'.format(discordname))
+                            watchdog('Debug: Member {} should be added now'.format(discordname))
                         else:
                             try:
                                 role = discord.utils.get(server.roles, name=donor_role)
@@ -564,10 +661,10 @@ def roleacc(message, group):
         try:
             getattr(usr, 'roles') 
         except AttributeError:
-            print("-- Debug info -- ")
-            print("type: " + message.type.name)
-            print("channel: " + message.channel.name)
-            print("bot: " + str(message.author.bot))
+            watchdog("-- Debug info -- ")
+            watchdog("type: " + message.type.name)
+            watchdog("channel: " + message.channel.name)
+            watchdog("bot: " + str(message.author.bot))
             return stopUnauth
         
             global roles_admin
@@ -585,6 +682,12 @@ def user_lookup(member, user):
     return str(member.name).lower() == user.lower() or str(member.name + '#' + member.discriminator).lower() == user or member.id == user or str(member.nick).lower() == user.lower()
 
 # --- db functions ---
+# Helper function to do logging
+def watchdog(message):
+    if bot_debug == 1:
+        date = str(datetime.datetime.now().strftime("%Y-%m-%d - %I:%M:%S"))
+        print(date + " # " + message)
+
 # Helper function to execute a query and return the results in a list object
 def db_connect():
     # Setup the db connection with the global params
