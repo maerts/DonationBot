@@ -75,7 +75,7 @@ If today is not the 25th of the month or later, it will count as a donation for 
 e.g. if today is the 19th of september and you type `!donor add nickname 1` it will count towards the end of september. If it is the 25th of September it will count towards the end of October.\n\
 `!donor expire {user}` find out the expiration for a user. \n\
 `!donor contrib {user}` find out all months added to a user with the date.\n\
-`!donor change {olduser} {newuser}` update a user that already .\n\
+`!donor change {olduser} {newuser}` update an existing user to a new user.\n\
 `!donor subs` will list all users in the database with a valid subscription and when it runs out.\n\
 `!donor expiration` will list all users whose subscription runs out at the end of this month.\n\
 `!donor freeloader` will list all users whose subscription has run out but that still have the Donor role.\n\
@@ -122,17 +122,25 @@ def on_message(message):
 def donor_subs(message):
     # Current time
     now = int(time.time())
-    # verify existence of discordid on the server
+    # get all donors with a valid date higher than now
     db = db_connect()
     c = db.cursor()
     c.execute("SELECT * FROM donor WHERE validdate > {} ORDER BY validdate ASC, name;".format(now))
     data = c.fetchall()
     c.close()
     db_close(db)
+    
+    # get the mount of donors.
+    db = db_connect()
+    c = db.cursor()
+    c.execute("SELECT count(1) FROM donor WHERE validdate > {};".format(now))
+    amount = c.fetchone()
+    c.close()
+    db_close(db)
 
     # Build the list of subs
     msg = '```'
-    msg += 'Active subscribers\n'
+    msg += 'Active subscribers ({})\n'.format(amount[0])
     msg += '\n'
     msg += 'Name'.ljust(40) + 'Date'.ljust(20) + 'discord_id\n'
     msg += '\n'.rjust(95, '-')
@@ -202,6 +210,10 @@ def donor_freeloader(message):
             
 # Helper function to check your expiring members' subs
 def donor_expiration(message):
+    msg = message.content.lower().split()
+    notify = False
+    if len(msg) == 3 and msg[2] == 'notify':
+        notify = True
     # Get the last day of this month.
     d_valid = datetime.date.fromtimestamp(int(time.time()))
     d_new_valid = d_valid + relativedelta(day=31)
@@ -221,6 +233,9 @@ def donor_expiration(message):
     msg += 'name'.ljust(35) + 'id\n'
     msg += '----\n'
     for i, d in enumerate(data):
+        if notify:
+            user = server.get_member(d[0])
+            yield from client.send_message(user, "Your subscription will expire at the end of this mont. If you wish to have full access to all scanning information, donate again through paypal: https://www.paypal.me/FundTeamLugia")
         tmp = str(d[1]).ljust(35) + str(d[0]) + '\n'
         if (len(tmp) + len(msg)) >  1997:
             msg += '```'
