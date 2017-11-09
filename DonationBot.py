@@ -121,10 +121,52 @@ def on_message(message):
         yield from donor_expire(message)
     if '!donor freeloader' == message.content[0:17] and (roleacc(message, 'super') or roleacc(message, 'admin')):
         yield from donor_freeloader(message)
+    if '!donor stats' == message.content[0:17] and (roleacc(message, 'super') or roleacc(message, 'admin')):
+        yield from donor_stats(message)
 
 ##################################################
 
 # -- Donor functions --
+# Helper function to get all active subscribers
+def donor_stats(message):
+    # Current time
+    now = int(time.time())
+    # get all donors with a valid date higher than now
+    db = db_connect()
+    c = db.cursor()
+    c.execute("SELECT CONCAT(MONTHNAME(FROM_UNIXTIME(validdate)), ' ', YEAR(FROM_UNIXTIME(validdate))) as short_notation, count(*) FROM donor GROUP BY short_notation, validdate HAVING validdate > {} ORDER BY validdate ASC;".format(now))
+    data = c.fetchall()
+    c.close()
+    db_close(db)
+    
+    forecast = {}
+    for i, d in enumerate(data):
+        for key in forecast.keys():
+            tmp = forecast[key]
+            forecast[key] = tmp + int(d[1])
+        forecast[str(d[0])] = int(d[1])
+    s_forecast = [(k, forecast[k]) for k in sorted(forecast, key=forecast.get, reverse=True)]
+    
+    
+    # get the mount of donors.
+    db = db_connect()
+    c = db.cursor()
+    c.execute("SELECT count(1) FROM donor WHERE validdate > {};".format(now))
+    amount = c.fetchone()
+    c.close()
+    db_close(db)
+
+    # Build the list of subs
+    msg = '```'
+    msg += 'Active subscribers ({})\n'.format(amount[0])
+    msg += '\n'.rjust(50, '-')
+    msg += 'Forecast up to month\n'
+    msg += '\n'.rjust(50, '-')
+    for k, v in s_forecast:
+        msg+= k.ljust(25) + str(v) + '\n'
+    msg += '```'
+    yield from client.send_message(message.channel, msg)
+
 # Helper function to get all active subscribers
 def donor_subs(message):
     # Current time
@@ -192,6 +234,7 @@ def donor_freeloader(message):
         
     # Build the list of expiring subs
     msg = '```'
+    
     msg += 'The following members\' subscription has expired \n'
     msg += '\n'
     msg += 'name'.ljust(50) + 'expired'.ljust(15) + 'memberid\n'
@@ -331,47 +374,57 @@ def donor_contrib(message):
             discordid = None
             discordname = ""
             # lookup the userid, a bit clunky but fastest way.
+            count = 0
+            duplicatemembers = []
             for member in server.members:
                 if user_lookup(member, user):
                    discordid = member.id
                    discordname = member.name
-                   break
-            if discordid is not None:
-                # verify existence of rol on the server
-                db = db_connect()
-                c = db.cursor()
-                c.execute("SELECT * FROM donor WHERE discord_id = '{}';".format(discordid))
-                row = c.fetchone()
-                c.close()
-                db_close(db)
-                if row is None:
-                    yield from client.send_message(message.channel, "Contribution information for member `{}` can't be found in the system.".format(discordname))                
-                else:
-                    startdate = str(datetime.date.fromtimestamp(int(row[2])))
-                    validdate = str(datetime.date.fromtimestamp(int(row[3])))
+                   count = count + 1
+                   duplicatemembers.append(member)
+            if count > 1:
+                dup_msg = "I have discovered multiple users with this name.\nVerify and try it with the discriminator or id.\n"
+                dup_msg += "\n".rjust(35, '-')
+                for i, member in enumerate(duplicatemembers):
+                    dup_msg += str(i + 1) + ". **" + member.name + "#" + member.discriminator + "** (" + member.id + ")\n"
+                yield from client.send_message(message.channel, dup_msg)
+            else:
+                if discordid is not None:
                     # verify existence of rol on the server
                     db = db_connect()
                     c = db.cursor()
-                    c.execute("SELECT * FROM donation WHERE discord_id = '{}' ORDER BY id DESC;".format(discordid))
-                    data = c.fetchall()
+                    c.execute("SELECT * FROM donor WHERE discord_id = '{}';".format(discordid))
+                    row = c.fetchone()
                     c.close()
                     db_close(db)
+                    if row is None:
+                        yield from client.send_message(message.channel, "Contribution information for member `{}` can't be found in the system.".format(discordname))                
+                    else:
+                        startdate = str(datetime.date.fromtimestamp(int(row[2])))
+                        validdate = str(datetime.date.fromtimestamp(int(row[3])))
+                        # verify existence of rol on the server
+                        db = db_connect()
+                        c = db.cursor()
+                        c.execute("SELECT * FROM donation WHERE discord_id = '{}' ORDER BY id DESC;".format(discordid))
+                        data = c.fetchall()
+                        c.close()
+                        db_close(db)
 
-                    msg = '```'
-                    msg += 'Contribution information for {}\n'.format(discordname)
-                    msg += '----------------------\n'
-                    msg += 'Added date:'.ljust(12) + startdate + '\n'
-                    msg += 'Valid date:'.ljust(12) + validdate + '\n'
-                    msg += '\n'
-                    msg += 'months'.ljust(12) + 'date\n'
-                    msg += '----------------------\n'
-                    for i, d in enumerate(data):
-                        msg += str(d[2]).ljust(12) + str(datetime.date.fromtimestamp(int(d[3]))) + '\n'
-                    msg += '```'
-                    
-                    yield from client.send_message(message.channel, msg)
-            else:
-                yield from client.send_message(message.channel, "Unfortunately member `{}` can't be found in the system, check the spelling or try finding it by id.".format(user))
+                        msg = '```'
+                        msg += 'Contribution information for {}\n'.format(discordname)
+                        msg += '----------------------\n'
+                        msg += 'Added date:'.ljust(12) + startdate + '\n'
+                        msg += 'Valid date:'.ljust(12) + validdate + '\n'
+                        msg += '\n'
+                        msg += 'months'.ljust(12) + 'date\n'
+                        msg += '----------------------\n'
+                        for i, d in enumerate(data):
+                            msg += str(d[2]).ljust(12) + str(datetime.date.fromtimestamp(int(d[3]))) + '\n'
+                        msg += '```'
+                        
+                        yield from client.send_message(message.channel, msg)
+                else:
+                    yield from client.send_message(message.channel, "Unfortunately member `{}` can't be found in the system, check the spelling or try finding it by id.".format(user))
         else:
             yield from client.send_message(message.channel, "You don't have permissions to lookup other members' expiration date.")
     else: 
@@ -407,24 +460,34 @@ def donor_expire(message):
             discordid = None
             discordname = ""
             # lookup the userid, a bit clunky but fastest way.
+            count = 0
+            duplicatemembers = []
             for member in server.members:
                 if user_lookup(member, user):
                    discordid = member.id
                    discordname = member.name
-                   break
-            if discordid is not None:
-                # verify existence of rol on the server
-                db = db_connect()
-                c = db.cursor()
-                c.execute("SELECT * FROM donor WHERE discord_id = '{}';".format(discordid))
-                row = c.fetchone()
-                c.close()
-                db_close(db)
-                if row is not None:
-                    validity = int(row[3])
-                    yield from client.send_message(message.channel, "The subscription for `{}` will expire on `{}`.".format(discordname, str(datetime.date.fromtimestamp(validity))))
-                else:
-                    yield from client.send_message(message.channel, "Unfortunately member `{}` can't be found in the system, check the spelling or try finding it by id.".format(user))
+                   count = count + 1
+                   duplicatemembers.append(member)
+            if count > 1:
+                dup_msg = "I have discovered multiple users with this name.\nVerify and try it with the discriminator or id.\n"
+                dup_msg += "\n".rjust(35, '-')
+                for i, member in enumerate(duplicatemembers):
+                    dup_msg += str(i + 1) + ". **" + member.name + "#" + member.discriminator + "** (" + member.id + ")\n"
+                yield from client.send_message(message.channel, dup_msg)
+            else:
+                if discordid is not None:
+                    # verify existence of rol on the server
+                    db = db_connect()
+                    c = db.cursor()
+                    c.execute("SELECT * FROM donor WHERE discord_id = '{}';".format(discordid))
+                    row = c.fetchone()
+                    c.close()
+                    db_close(db)
+                    if row is not None:
+                        validity = int(row[3])
+                        yield from client.send_message(message.channel, "The subscription for `{}` will expire on `{}`.".format(discordname, str(datetime.date.fromtimestamp(validity))))
+                    else:
+                        yield from client.send_message(message.channel, "Unfortunately member `{}` can't be found in the system, check the spelling or try finding it by id.".format(user))
         else:
             yield from client.send_message(message.channel, "You don't have permissions to lookup other members' expiration date.")
     else: 
@@ -553,80 +616,36 @@ def donor_add(message):
         discordname = ""
         discordmember = None
         # lookup the userid, a bit clunky but fastest way.
+        count = 0
+        duplicatemembers = []
         for member in server.members:
             if user_lookup(member, user):
                discordid = member.id
                discordname = member.name
-               discordmember = member
-               break
-        if discordid is not None:
-            # verify existence of rol on the server
-            db = db_connect()
-            c = db.cursor()
-            c.execute("SELECT * FROM donor WHERE discord_id = '{}';".format(discordid))
-            row = c.fetchone()
-            c.close()
-            db_close(db)
-
-            # If the donor exists, add a payment & update the validity
-            if row is not None:
-                created = int(time.time())
-                old_valid = int(row[3])
-                valid = new_valid_time(old_valid, month)
-                
+               count = count + 1
+               duplicatemembers.append(member)
+        if count > 1:
+            dup_msg = "I have discovered multiple users with this name.\nVerify and try it with the discriminator or id.\n"
+            dup_msg += "\n".rjust(35, '-')
+            for i, member in enumerate(duplicatemembers):
+                dup_msg += str(i + 1) + ". **" + member.name + "#" + member.discriminator + "** (" + member.id + ")\n"
+            yield from client.send_message(message.channel, dup_msg)
+        else:
+            if discordid is not None:
+                # verify existence of rol on the server
                 db = db_connect()
                 c = db.cursor()
-                donationadded = False
-                try:
-                    c.execute("""INSERT INTO donation (discord_id, amt, donationdate) VALUES (%s, %s, %s)""", (discordid, month, created))
-                    db.commit()
-                    donationadded = True
-                except MySQLdb.Error as e:
-                    db.rollback()
-                    watchdog(str(e))
+                c.execute("SELECT * FROM donor WHERE discord_id = '{}';".format(discordid))
+                row = c.fetchone()
                 c.close()
                 db_close(db)
 
-                if donationadded:
-                    db = db_connect()
-                    c = db.cursor()
-                    try:
-                        c.execute ("""UPDATE donor SET validdate=%s WHERE discord_id=%s""", (valid, discordid))
-                        db.commit() 
-                    except:
-                        db.rollback()
-                    c.close()
-                    db_close(db)
-                    if old_valid < created:
-                        try:
-                            role = discord.utils.get(server.roles, name=donor_role)
-                            yield from client.add_roles(discordmember, role)
-                        except:
-                            if bot_debug == 1:
-                                watchdog('Debug: Member {} should be added now'.format(discordname))
-                            yield from client.send_message(message.channel, "There was an error trying to add `{}` to the `{}`.".format(discordname, donor_role))
-                    yield from client.send_message(message.channel, "Added a contribution for `{} months` for user `{}` it will expire at `{}`".format(month, discordname, str(datetime.date.fromtimestamp(valid))))
-                else:
-                    yield from client.send_message(message.channel, "There was a problem adding a donation for donor `{}`. Contact an admin if this problem persists".format(discordname))
-            # If the donor doesn't exist, create a new entry for the donors, calculate the validity & add a payment
-            else:
-                created = int(time.time())
-                valid = new_valid_time(created, month)
-
-                db = db_connect()
-                c = db.cursor()
-                donoradded = False
-                try:
-                    c.execute("""INSERT INTO donor (discord_id, name, startdate, validdate) VALUES (%s, %s, %s, %s)""", (discordid, discordname, created, valid))
-                    db.commit()
-                    donoradded = True
-                except MySQLdb.Error as e:
-                    db.rollback()
-                    watchdog(str(e))
-                c.close()
-                db_close(db)
-                
-                if donoradded:
+                # If the donor exists, add a payment & update the validity
+                if row is not None:
+                    created = int(time.time())
+                    old_valid = int(row[3])
+                    valid = new_valid_time(old_valid, month)
+                    
                     db = db_connect()
                     c = db.cursor()
                     donationadded = False
@@ -641,20 +660,73 @@ def donor_add(message):
                     db_close(db)
 
                     if donationadded:
+                        db = db_connect()
+                        c = db.cursor()
                         try:
-                            role = discord.utils.get(server.roles, name=donor_role)
-                            yield from client.add_roles(discordmember, role)
+                            c.execute ("""UPDATE donor SET validdate=%s WHERE discord_id=%s""", (valid, discordid))
+                            db.commit() 
                         except:
-                            if bot_debug == 1:
-                                watchdog('Debug: Member {} should be added now'.format(discordname))
-                            yield from client.send_message(message.channel, "There was an error trying to add `{}` to the `{}`.".format(discordname, donor_role))
-                        yield from client.send_message(message.channel, "Added donor `{}` to the database with a first contribution for `{} months`".format(discordname, month))
+                            db.rollback()
+                        c.close()
+                        db_close(db)
+                        if old_valid < created:
+                            try:
+                                role = discord.utils.get(server.roles, name=donor_role)
+                                yield from client.add_roles(discordmember, role)
+                            except:
+                                if bot_debug == 1:
+                                    watchdog('Debug: Member {} should be added now'.format(discordname))
+                                yield from client.send_message(message.channel, "There was an error trying to add `{}` to the `{}`.".format(discordname, donor_role))
+                        yield from client.send_message(message.channel, "Added a contribution for `{} months` for user `{}` it will expire at `{}`".format(month, discordname, str(datetime.date.fromtimestamp(valid))))
                     else:
-                        yield from client.send_message(message.channel, "There was a problem adding a donation for donor `{}`. Contact an admin if this problem persists".format(user))
+                        yield from client.send_message(message.channel, "There was a problem adding a donation for donor `{}`. Contact an admin if this problem persists".format(discordname))
+                # If the donor doesn't exist, create a new entry for the donors, calculate the validity & add a payment
                 else:
-                    yield from client.send_message(message.channel, "An error occurred adding donor `{}` to the database, try again later or contact and administrator".format(user))
-        else:
-            yield from client.send_message(message.channel, "An error occurred trying to add donor `{}` to the database".format(user))
+                    created = int(time.time())
+                    valid = new_valid_time(created, month)
+
+                    db = db_connect()
+                    c = db.cursor()
+                    donoradded = False
+                    try:
+                        c.execute("""INSERT INTO donor (discord_id, name, startdate, validdate) VALUES (%s, %s, %s, %s)""", (discordid, discordname, created, valid))
+                        db.commit()
+                        donoradded = True
+                    except MySQLdb.Error as e:
+                        db.rollback()
+                        watchdog(str(e))
+                    c.close()
+                    db_close(db)
+                    
+                    if donoradded:
+                        db = db_connect()
+                        c = db.cursor()
+                        donationadded = False
+                        try:
+                            c.execute("""INSERT INTO donation (discord_id, amt, donationdate) VALUES (%s, %s, %s)""", (discordid, month, created))
+                            db.commit()
+                            donationadded = True
+                        except MySQLdb.Error as e:
+                            db.rollback()
+                            watchdog(str(e))
+                        c.close()
+                        db_close(db)
+
+                        if donationadded:
+                            try:
+                                role = discord.utils.get(server.roles, name=donor_role)
+                                yield from client.add_roles(discordmember, role)
+                            except:
+                                if bot_debug == 1:
+                                    watchdog('Debug: Member {} should be added now'.format(discordname))
+                                yield from client.send_message(message.channel, "There was an error trying to add `{}` to the `{}`.".format(discordname, donor_role))
+                            yield from client.send_message(message.channel, "Added donor `{}` to the database with a first contribution for `{} months`".format(discordname, month))
+                        else:
+                            yield from client.send_message(message.channel, "There was a problem adding a donation for donor `{}`. Contact an admin if this problem persists".format(user))
+                    else:
+                        yield from client.send_message(message.channel, "An error occurred adding donor `{}` to the database, try again later or contact and administrator".format(user))
+            else:
+                yield from client.send_message(message.channel, "An error occurred trying to add donor `{}` to the database".format(user))
 
 # -- End Donor functions
 
@@ -732,8 +804,36 @@ def roleacc(message, group):
 
 # Helper function to get the correct member
 def user_lookup(member, user):
-
+    regex = _regex_from_encoded_pattern('/<@(\d+)>/si')
+    match_id = regex.findall(user)
+    if len(match_id) == 1:
+        user = match_id[0]
     return str(member.name).lower() == user.lower() or str(member.name + '#' + member.discriminator).lower() == user or member.id == user or str(member.nick).lower() == user.lower()
+
+# Helper for regex
+def _regex_from_encoded_pattern(s):
+    if s.startswith('/') and s.rfind('/') != 0:
+        # Parse it: /PATTERN/FLAGS
+        idx = s.rfind('/')
+        pattern, flags_str = s[1:idx], s[idx+1:]
+        flag_from_char = {
+            "i": re.IGNORECASE,
+            "l": re.LOCALE,
+            "s": re.DOTALL,
+            "m": re.MULTILINE,
+            "u": re.UNICODE,
+        }
+        flags = 0
+        for char in flags_str:
+            try:
+                flags |= flag_from_char[char]
+            except KeyError:
+                raise ValueError("unsupported regex flag: '%s' in '%s' "
+                                 "(must be one of '%s')"
+                                 % (char, s, ''.join(flag_from_char.keys())))
+        return re.compile(s[1:idx], flags)
+    else: # not an encoded regex
+        return re.compile(re.escape(s))
 
 # --- db functions ---
 # Helper function to do logging
