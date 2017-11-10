@@ -58,6 +58,8 @@ def on_ready():
     for server in client.servers:
         discord_server = server.id
         watchdog(server.id + ': ' + server.name)
+        for role in server.roles:
+            watchdog(role.name + ': ' + role.id)
     
 
 # --- Help messages ---
@@ -1074,7 +1076,10 @@ def _regex_from_encoded_pattern(s):
 def watchdog(message):
     if bot_debug == 1:
         date = str(datetime.datetime.now().strftime("%Y-%m-%d - %I:%M:%S"))
-        print(date + " # " + message)
+        f = open(os.path.join('log', str(datetime.datetime.now().strftime("%Y-%m-%d") + '-debug.log')), 'a')
+        f.write(date + " # " + message + '\n')
+        f.close()
+
 
 # Helper function to execute a query and return the results in a list object
 def db_connect():
