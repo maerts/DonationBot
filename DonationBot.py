@@ -31,6 +31,7 @@ sql_db = config.get('sql', 'sql.db')
 # - admin roles
 roles_admin = config.get('admin', 'admin.roles').split(',')
 super_admin = config.get('admin', 'admin.super').split(',')
+channels_admin = config.get('admin', 'admin.channels').split(',')
 # - donor role
 donor_role = config.get('donor', 'donor.role')
 # - bot settings
@@ -79,8 +80,12 @@ e.g. if today is the 19th of september and you type `!donor add nickname 1` it w
 `!donor contrib {user}` find out all months added to a user with the date.\n\
 `!donor change {olduser} {newuser}` update an existing user to a new user.\n\
 `!donor subs` will list all users in the database with a valid subscription and when it runs out.\n\
+`!donor stats` will give a short list with information about donor numbers.\n\
 `!donor expiration` will list all users whose subscription runs out at the end of this month.\n\
 `!donor freeloader` will list all users whose subscription has run out but that still have the Donor role.\n\
+`!note add {user} {note}` will add a note to a user that only mods & admins can access.\n\
+`!note del {id}` will delete a note from the database.\n\
+`!note list {user}` will list all notes or the notes for a specific user when provided.\n\
 "
 # The message shown for unprivileged users
 helpsamsg = "\n\n\
@@ -123,8 +128,179 @@ def on_message(message):
         yield from donor_freeloader(message)
     if '!donor stats' == message.content[0:17] and (roleacc(message, 'super') or roleacc(message, 'admin')):
         yield from donor_stats(message)
+    if '!note add' == message.content[0:9] and (roleacc(message, 'super') or roleacc(message, 'admin')):
+        yield from note_add(message)
+    if '!note del' == message.content[0:9] and (roleacc(message, 'super') or roleacc(message, 'admin')):
+        yield from note_del(message)
+    if '!note list' == message.content[0:10] and (roleacc(message, 'super') or roleacc(message, 'admin')):
+        yield from note_list(message)
 
 ##################################################
+# -- Note functions --
+# Helper function to check your donation expiration
+def note_add(message):
+    server = client.get_server(discord_server)
+    msg = message.content.lower().split()
+    if len(msg) > 3:
+        db = db_connect()
+        c = db.cursor()
+        now = int(time.time())
+        user = msg[2]
+        note = msg[3:]
+        discordid = None
+        discordname = ""
+        # lookup the userid, a bit clunky but fastest way.
+        count = 0
+        duplicatemembers = []
+        for member in server.members:
+            if user_lookup(member, user):
+               discordid = member.id
+               discordname = member.name
+               count = count + 1
+               duplicatemembers.append(member)
+        if count > 1:
+            dup_msg = "I have discovered multiple users with this name.\nVerify and try it with the discriminator or id.\n"
+            dup_msg += "\n".rjust(35, '-')
+            for i, member in enumerate(duplicatemembers):
+                dup_msg += str(i + 1) + ". **" + member.name + "#" + member.discriminator + "** (" + member.id + ")\n"
+            yield from client.send_message(message.channel, dup_msg)
+        else:
+            if discordid is not None:
+                # verify existence of rol on the server
+                success = False
+                try:
+                
+                    c.execute("""INSERT INTO notes (discord_id, reporter_id, startdate, note) VALUES (%s, %s, %s, %s)""", (discordid, message.author.id, now, " ".join(note)))
+                    db.commit()
+                    success = True
+                except MySQLdb.Error as e:
+                    db.rollback()
+                    watchdog("INSERT ERROR: " + str(e))
+                c.close()
+                db_close(db)
+                if success:
+                    yield from client.send_message(message.channel, "A note has been recorded for `{}`.".format(discordname))
+                else:
+                    yield from client.send_message(message.channel, "Something went wrong trying to add a note for `{}`.".format(discordname))
+    else:
+        yield from client.send_message(message.channel, "Wrong usage! `!note add user this guy is awesome`")
+
+def note_del(message):
+    server = client.get_server(discord_server)
+    msg = message.content.lower().split()
+    if len(msg) == 3:
+        db = db_connect()
+        c = db.cursor()
+        nid = msg[2]
+
+        # verify existence of rol on the server
+        deleted = 0
+        try:
+            c.execute("""DELETE FROM notes WHERE nid=%s""", (nid))
+            deleted = c.rowcount
+            db.commit()
+        except MySQLdb.Error as e:
+            db.rollback()
+            watchdog(str(e))
+        c.close()
+        db_close(db)
+        if deleted > 0:
+            yield from client.send_message(message.channel, "Note with id `{}` has been removed.".format(nid))
+        else:
+            yield from client.send_message(message.channel, "Something went wrong trying to delete note with id `{}`.".format(nid))
+    else:
+        yield from client.send_message(message.channel, "Wrong usage! `!note del 123` where 123 is the note number")
+
+def note_list(message):
+    server = client.get_server(discord_server)
+    msg = message.content.lower().split()
+    if len(msg) >= 3:
+        db = db_connect()
+        c = db.cursor()
+        now = int(time.time())
+        user = msg[2]
+        note = msg[3:]
+        discordid = None
+        discordname = ""
+        # lookup the userid, a bit clunky but fastest way.
+        count = 0
+        duplicatemembers = []
+        for member in server.members:
+            if user_lookup(member, user):
+               discordid = member.id
+               discordname = member.name
+               count = count + 1
+               duplicatemembers.append(member)
+        if count > 1:
+            dup_msg = "I have discovered multiple users with this name.\nVerify and try it with the discriminator or id.\n"
+            dup_msg += "\n".rjust(35, '-')
+            for i, member in enumerate(duplicatemembers):
+                dup_msg += str(i + 1) + ". **" + member.name + "#" + member.discriminator + "** (" + member.id + ")\n"
+            yield from client.send_message(message.channel, dup_msg)
+        else:
+            if discordid is not None:
+                # verify existence of rol on the server
+                c.execute("SELECT * FROM notes WHERE discord_id = '{}' ORDER BY nid ASC;".format(discordid))
+                data = c.fetchall()
+                c.close()
+                db_close(db)
+                
+                msg = '```'
+                msg += 'Notes for {}\n'.format(discordname)
+                msg += '\n'.rjust(50, '-')
+                msg += 'nid'.ljust(5) + 'date'.ljust(15) + 'by'.ljust(20) +'note\n'
+                msg += '\n'.rjust(50, '-')
+                for i, d in enumerate(data):
+                    by_member = "unknown"
+                    for member in server.members:
+                        if user_lookup(member, str(d[2])):
+                            by_member = member.name
+                    d_nid = str(d[0]).ljust(5)
+                    d_date = str(datetime.date.fromtimestamp(int(d[3]))).ljust(15)
+                    d_by = by_member.ljust(20)
+                    msg += d_nid + d_date + d_by + d[4].decode('ascii') + '\n'
+                msg += '```'
+                return_channel = message.channel
+                if return_channel.name not in channels_admin and not return_channel.is_private:
+                    return_channel = message.author
+                yield from client.send_message(return_channel, msg)
+    else:
+        db = db_connect()
+        c = db.cursor()
+        now = int(time.time())
+        # verify existence of rol on the server
+        c.execute("SELECT * FROM notes ORDER BY nid ASC;")
+        data = c.fetchall()
+        c.close()
+        db_close(db)
+
+        msg = '```'
+        msg += 'All notes\n'
+        msg += '\n'.rjust(80, '-')
+        msg += 'nid'.ljust(5) + 'date'.ljust(15) + 'for'.ljust(20) + 'by'.ljust(20) +'note\n'
+        msg += '\n'.rjust(80, '-')
+        for i, d in enumerate(data):
+            by_member = "unknown"
+            for member in server.members:
+                if user_lookup(member, str(d[2])):
+                    by_member = member.name
+            for_member = ""
+            for member in server.members:
+                if user_lookup(member, str(d[1])):
+                    for_member = member.name
+            d_nid = str(d[0]).ljust(5)
+            d_date = str(datetime.date.fromtimestamp(int(d[3]))).ljust(15)
+            d_for = for_member.ljust(20)
+            d_by = by_member.ljust(20)
+            msg += d_nid + d_date + d_for + d_by + d[4].decode('ascii') + '\n'
+        msg += '```'
+        return_channel = message.channel
+        if return_channel.name not in channels_admin and not return_channel.is_private:
+            return_channel = message.author
+        yield from client.send_message(return_channel, msg)
+
+# -- End note functions --
+
 
 # -- Donor functions --
 # Helper function to get all active subscribers
@@ -409,7 +585,6 @@ def donor_contrib(message):
                         data = c.fetchall()
                         c.close()
                         db_close(db)
-
                         msg = '```'
                         msg += 'Contribution information for {}\n'.format(discordname)
                         msg += '----------------------\n'
@@ -420,9 +595,38 @@ def donor_contrib(message):
                         msg += '----------------------\n'
                         for i, d in enumerate(data):
                             msg += str(d[2]).ljust(12) + str(datetime.date.fromtimestamp(int(d[3]))) + '\n'
-                        msg += '```'
                         
+                        msg += '```'
                         yield from client.send_message(message.channel, msg)
+
+                        return_channel = message.channel
+                        if return_channel.name in channels_admin or return_channel.is_private:
+                            db = db_connect()
+                            c = db.cursor()
+                            c.execute("SELECT * FROM notes WHERE discord_id = '{}' ORDER BY nid ASC;".format(discordid))
+                            data = c.fetchall()
+                            c.close()
+                            db_close(db)
+                            
+                            note_cnt = 0
+                            msg = '```'
+                            msg += 'Notes for {}\n'.format(discordname)
+                            msg += '\n'.rjust(50, '-')
+                            msg += 'nid'.ljust(5) + 'date'.ljust(15) + 'by'.ljust(20) +'note\n'
+                            msg += '\n'.rjust(50, '-')
+                            for i, d in enumerate(data):
+                                note_cnt = note_cnt + 1
+                                by_member = "unknown"
+                                for member in server.members:
+                                    if user_lookup(member, str(d[2])):
+                                        by_member = member.name
+                                d_nid = str(d[0]).ljust(5)
+                                d_date = str(datetime.date.fromtimestamp(int(d[3]))).ljust(15)
+                                d_by = by_member.ljust(20)
+                                msg += d_nid + d_date + d_by + d[4].decode('ascii') + '\n'
+                            msg += '```'
+                            if note_cnt > 0:
+                                yield from client.send_message(return_channel, msg)
                 else:
                     yield from client.send_message(message.channel, "Unfortunately member `{}` can't be found in the system, check the spelling or try finding it by id.".format(user))
         else:
@@ -486,6 +690,34 @@ def donor_expire(message):
                     if row is not None:
                         validity = int(row[3])
                         yield from client.send_message(message.channel, "The subscription for `{}` will expire on `{}`.".format(discordname, str(datetime.date.fromtimestamp(validity))))
+                        return_channel = message.channel
+                        if return_channel.name in channels_admin or return_channel.is_private:
+                            db = db_connect()
+                            c = db.cursor()
+                            c.execute("SELECT * FROM notes WHERE discord_id = '{}' ORDER BY nid ASC;".format(discordid))
+                            data = c.fetchall()
+                            c.close()
+                            db_close(db)
+
+                            note_cnt = 0
+                            msg = '```'
+                            msg += 'Notes for {}\n'.format(discordname)
+                            msg += '\n'.rjust(50, '-')
+                            msg += 'nid'.ljust(5) + 'date'.ljust(15) + 'by'.ljust(20) +'note\n'
+                            msg += '\n'.rjust(50, '-')
+                            for i, d in enumerate(data):
+                                note_cnt = note_cnt + 1
+                                by_member = "unknown"
+                                for member in server.members:
+                                    if user_lookup(member, str(d[2])):
+                                        by_member = member.name
+                                d_nid = str(d[0]).ljust(5)
+                                d_date = str(datetime.date.fromtimestamp(int(d[3]))).ljust(15)
+                                d_by = by_member.ljust(20)
+                                msg += d_nid + d_date + d_by + d[4].decode('ascii') + '\n'
+                            msg += '```'
+                            if note_cnt > 0:
+                                yield from client.send_message(return_channel, msg)
                     else:
                         yield from client.send_message(message.channel, "Unfortunately member `{}` can't be found in the system, check the spelling or try finding it by id.".format(user))
         else:
@@ -792,19 +1024,21 @@ def roleacc(message, group):
             watchdog("channel: " + message.channel.name)
             watchdog("bot: " + str(message.author.bot))
             return stopUnauth
-        
-            global roles_admin
-            # Cycle through the roles on the user object
-            for role in roles_admin:
-               if role.id in roles_list.keys() and roles_list[role.id][group] == 1:
-                 stopUnauth = True
-                 break         
-            return stopUnauth
+
+        for role in usr.roles:
+           if role.id in roles_admin:
+             stopUnauth = True
+             break         
+        return stopUnauth
     return stopUnauth
 
 # Helper function to get the correct member
 def user_lookup(member, user):
     regex = _regex_from_encoded_pattern('/<@(\d+)>/si')
+    match_id = regex.findall(user)
+    if len(match_id) == 1:
+        user = match_id[0]
+    regex = _regex_from_encoded_pattern('/@(.+)/si')
     match_id = regex.findall(user)
     if len(match_id) == 1:
         user = match_id[0]
