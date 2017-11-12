@@ -122,9 +122,9 @@ def on_message(message):
         yield from donor_clean(message)
     if '!donor contrib' == message.content[0:14]:
         yield from donor_contrib(message)
-    if '!donor change' == message.content[0:13]:
+    if '!donor change' == message.content[0:13] and (roleacc(message, 'super') or roleacc(message, 'admin')):
         yield from donor_change(message)
-    if '!donor expire' == message.content[0:13] and (roleacc(message, 'super') or roleacc(message, 'admin')):
+    if '!donor expire' == message.content[0:13]:
         yield from donor_expire(message)
     if '!donor freeloader' == message.content[0:17] and (roleacc(message, 'super') or roleacc(message, 'admin')):
         yield from donor_freeloader(message)
@@ -654,7 +654,7 @@ def donor_contrib(message):
           msg+= 'There is no contribution information for your user'
       msg += '```'
       
-      yield from client.send_message(message.channel, msg)
+      yield from client.send_message(message.author, msg)
 
 # Helper function to check your donation expiration
 def donor_expire(message):
@@ -737,7 +737,7 @@ def donor_expire(message):
       # If the donor exists, add a payment & update the validity
       if row is not None:
           validity = int(row[3])
-          yield from client.send_message(message.channel, "Your subscription will expire on `{}`.".format(str(datetime.date.fromtimestamp(validity))))
+          yield from client.send_message(message.author, "Your subscription will expire on `{}`.".format(str(datetime.date.fromtimestamp(validity))))
       else:
           yield from client.send_message(message.channel, "Unfortunately you are not known in the system, please contact a moderator if you have donated.")
 
