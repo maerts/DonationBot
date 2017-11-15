@@ -8,6 +8,8 @@ import traceback
 import MySQLdb
 import datetime
 import gc
+import traceback
+import sys
 from datetime import date, timedelta
 from dateutil.relativedelta import relativedelta
 from time import sleep
@@ -813,10 +815,6 @@ def donor_change(message):
                     c.close()
                     db_close(db)
                     try:
-                        # Remove roles from old user
-                        role = discord.utils.get(server.roles, name=donor_role)
-                        yield from client.remove_roles(discordmember, role)
-                        
                         # Add roles to new user
                         role = discord.utils.get(server.roles, name=donor_role)
                         yield from client.add_roles(nmember, role)
@@ -841,7 +839,6 @@ def donor_add(message):
         yield from client.send_message(message.channel, "You are missing a parameter to the command, please verify and retry.")
     else:
         # instance of server for later use
-        server = client.get_server(discord_server)
         # We expect these values.
         user = msg[2]
         month = msg[3]
@@ -856,6 +853,7 @@ def donor_add(message):
             if user_lookup(member, user):
                discordid = member.id
                discordname = member.name
+               discordmember = member
                count = count + 1
                duplicatemembers.append(member)
         if count > 1:
@@ -907,7 +905,9 @@ def donor_add(message):
                             try:
                                 role = discord.utils.get(server.roles, name=donor_role)
                                 yield from client.add_roles(discordmember, role)
-                            except:
+                            except Exception:
+                                watchdog(traceback.format_exc())
+                                watchdog(sys.exc_info()[0])
                                 if bot_debug == 1:
                                     watchdog('Debug: Member {} should be added now'.format(discordname))
                                 yield from client.send_message(message.channel, "There was an error trying to add `{}` to the `{}`.".format(discordname, donor_role))
@@ -947,13 +947,16 @@ def donor_add(message):
                         db_close(db)
 
                         if donationadded:
+                            role = discord.utils.get(server.roles, name=donor_role)
+                            watchdog(str(role.name) + ' - ' + str(role.id))
                             try:
-                                role = discord.utils.get(server.roles, name=donor_role)
                                 yield from client.add_roles(discordmember, role)
-                            except:
+                            except Exception:
+                                watchdog(traceback.format_exc())
+                                watchdog(sys.exc_info()[0])
                                 if bot_debug == 1:
-                                    watchdog('Debug: Member {} should be added now'.format(discordname))
-                                yield from client.send_message(message.channel, "There was an error trying to add `{}` to the `{}`.".format(discordname, donor_role))
+                                    watchdog('Member {} could not be added'.format(discordname))
+                                yield from client.send_message(message.channel, "Forbidden error: There was an error trying to add `{}` to the `{}`.".format(discordname, donor_role))
                             yield from client.send_message(message.channel, "Added donor `{}` to the database with a first contribution for `{} months`".format(discordname, month))
                         else:
                             yield from client.send_message(message.channel, "There was a problem adding a donation for donor `{}`. Contact an admin if this problem persists".format(user))
