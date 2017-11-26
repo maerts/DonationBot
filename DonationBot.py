@@ -310,7 +310,8 @@ def note_list(message):
 # Helper function to get all active subscribers
 def donor_stats(message):
     # Current time
-    now = int(time.time())
+    now = int(time.time())    
+    
     # get all donors with a valid date higher than now
     db = db_connect()
     c = db.cursor()
@@ -440,6 +441,7 @@ def donor_freeloader(message):
             
 # Helper function to check your expiring members' subs
 def donor_expiration(message):
+    server = client.get_server(discord_server)
     msg = message.content.lower().split()
     notify = False
     if len(msg) == 3 and msg[2] == 'notify':
@@ -464,8 +466,8 @@ def donor_expiration(message):
     msg += '----\n'
     for i, d in enumerate(data):
         if notify:
-            user = server.get_member(d[0])
-            yield from client.send_message(user, "Your subscription will expire at the end of this mont. If you wish to have full access to all scanning information, donate again through paypal: https://www.paypal.me/FundTeamLugia")
+            user = server.get_member(d[0]) # 
+            yield from client.send_message(user, "Just a reminder that your donation covers you until the end of this month, if you would like to retain full access to the sightings channels, donor chat and all the bot commands for the next month, please follow https://www.paypal.me/FundTeamLugia to donate again. Please remember to include your discord ID!")
         tmp = str(d[1]).ljust(35) + str(d[0]) + '\n'
         if (len(tmp) + len(msg)) >  1997:
             msg += '```'
@@ -830,7 +832,8 @@ def donor_change(message):
                 yield from client.send_message(message.channel, "This user you're trying to change isn't a donor yet, try adding the user through the `add` command".format(user))
         else:
             yield from client.send_message(message.channel, "One of the users couldn't be found, try again with different parameters".format(user))
-          
+
+            
 # Function to add monitored channels to the database
 def donor_add(message):
     server = client.get_server(discord_server)
