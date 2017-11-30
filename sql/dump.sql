@@ -1,8 +1,8 @@
--- MySQL dump 10.13  Distrib 5.7.19, for osx10.12 (x86_64)
+-- MySQL dump 10.13  Distrib 5.7.20, for Linux (x86_64)
 --
 -- Host: localhost    Database: donbot
 -- ------------------------------------------------------
--- Server version	5.7.19
+-- Server version	5.7.20-0ubuntu0.16.04.1
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -31,17 +31,8 @@ CREATE TABLE `donation` (
   KEY `discord_id_index` (`discord_id`),
   KEY `amount_index` (`amt`),
   KEY `donationdate_index` (`donationdate`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='This keeps track of donations in the system';
+) ENGINE=InnoDB AUTO_INCREMENT=442 DEFAULT CHARSET=utf8mb4 COMMENT='This keeps track of donations in the system';
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `donation`
---
-
-LOCK TABLES `donation` WRITE;
-/*!40000 ALTER TABLE `donation` DISABLE KEYS */;
-/*!40000 ALTER TABLE `donation` ENABLE KEYS */;
-UNLOCK TABLES;
 
 --
 -- Table structure for table `donor`
@@ -55,6 +46,7 @@ CREATE TABLE `donor` (
   `name` varchar(45) DEFAULT NULL,
   `startdate` bigint(20) DEFAULT NULL,
   `validdate` bigint(20) DEFAULT NULL,
+  `init` bigint(100) DEFAULT '0',
   PRIMARY KEY (`discord_id`),
   UNIQUE KEY `discord_id_UNIQUE` (`discord_id`),
   KEY `discord_id_index` (`discord_id`),
@@ -63,13 +55,40 @@ CREATE TABLE `donor` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Dumping data for table `donor`
+-- Table structure for table `history`
 --
 
-LOCK TABLES `donor` WRITE;
-/*!40000 ALTER TABLE `donor` DISABLE KEYS */;
-/*!40000 ALTER TABLE `donor` ENABLE KEYS */;
-UNLOCK TABLES;
+DROP TABLE IF EXISTS `history`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `history` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `init` bigint(20) DEFAULT '0',
+  `discord_id` bigint(20) DEFAULT NULL,
+  `updated` bigint(20) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `init` (`init`),
+  KEY `discord_id` (`discord_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Table to keep track of account changes.';
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `notes`
+--
+
+DROP TABLE IF EXISTS `notes`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `notes` (
+  `nid` bigint(20) NOT NULL AUTO_INCREMENT,
+  `discord_id` bigint(100) NOT NULL,
+  `reporter_id` bigint(100) DEFAULT NULL,
+  `startdate` bigint(20) DEFAULT NULL,
+  `note` blob,
+  PRIMARY KEY (`nid`,`discord_id`),
+  KEY `discord_id_index` (`discord_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COMMENT='The table containing the usernotes';
+/*!40101 SET character_set_client = @saved_cs_client */;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
@@ -80,4 +99,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2017-09-19 16:18:02
+-- Dump completed on 2017-11-30 13:35:52
