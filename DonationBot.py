@@ -96,6 +96,7 @@ helpsamsg = "\n\n\
 Super Admin commands\n\
 \n\
 `!donor clean` remove all the Donor role from expired contributors.\n\
+`!donor expiration notify` it does the same as `!donor expiration` with the addition of sending all expirees a DM about their expiration.\n\
 "
 # --- End help messages ---
 
@@ -415,13 +416,14 @@ def donor_freeloader(message):
         
     # Build the list of expiring subs
     msg = '```'
-    
+    counter = 0
     msg += 'The following members\' subscription has expired \n'
     msg += '\n'
     msg += 'name'.ljust(50) + 'expired'.ljust(15) + 'memberid\n'
     msg += ''.ljust(120, '-') + '\n'
     for member in server.members:
         if member.top_role.name == donor_role and member.id not in valid:
+            counter = counter + 1
             expired_date = 'Not in bot'
             if member.id in expired.keys():
                 expired_date = expired[member.id]
@@ -436,7 +438,8 @@ def donor_freeloader(message):
             msg += tmp
     msg += '```'
     yield from client.send_message(message.author, msg)
-
+    msg = "```A total of {} members have the donor status but aren't in the bot.```".format(str(counter))
+    yield from client.send_message(message.author, msg)
 
             
 # Helper function to check your expiring members' subs
@@ -458,6 +461,7 @@ def donor_expiration(message):
     c.close()
     db_close(db)
 
+    counter = 0
     # Build the list of expiring subs
     msg = '```'
     msg += 'The following members\' subscription will expire at the end of this month\n'
@@ -465,6 +469,7 @@ def donor_expiration(message):
     msg += 'name'.ljust(35) + 'id\n'
     msg += '----\n'
     for i, d in enumerate(data):
+        counter = counter + 1
         if notify:
             user = server.get_member(d[0]) # 
             yield from client.send_message(user, "Just a reminder that your donation covers you until the end of this month, if you would like to retain full access to the sightings channels, donor chat and all the bot commands for the next month, please follow https://www.paypal.me/FundTeamLugia to donate again. Please remember to include your discord ID!")
@@ -476,6 +481,9 @@ def donor_expiration(message):
         msg += tmp
     msg += '```'
     yield from client.send_message(message.author, msg)
+    msg = '```There are {} donors expiring at the end of the month.```'.format(str(counter))
+    yield from client.send_message(message.author, msg)
+    
             
 # Helper function to remove roles from expired subscriptions
 def donor_clean(message):
