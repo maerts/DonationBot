@@ -312,11 +312,14 @@ def note_list(message):
 def donor_stats(message):
     # Current time
     now = int(time.time())    
-    
+    mod_ids = get_management()
+    print(mod_ids)
     # get all donors with a valid date higher than now
     db = db_connect()
     c = db.cursor()
-    c.execute("SELECT CONCAT(MONTHNAME(FROM_UNIXTIME(validdate)), ' ', YEAR(FROM_UNIXTIME(validdate))) as short_notation, count(*) FROM donor GROUP BY short_notation, validdate HAVING validdate > {} ORDER BY validdate ASC;".format(now))
+    query = "SELECT CONCAT(MONTHNAME(FROM_UNIXTIME(validdate)), ' ', YEAR(FROM_UNIXTIME(validdate))) as short_notation, count(1) FROM donor GROUP BY short_notation, validdate HAVING validdate > {} ORDER BY validdate ASC;".format(now) # AND discord_id NOT IN ('{}')  | , "', '".join(mod_ids)
+    c.execute(query)
+    print(query);
     data = c.fetchall()
     c.close()
     db_close(db)
@@ -461,6 +464,8 @@ def donor_expiration(message):
     c.close()
     db_close(db)
 
+    if notify:
+        variable_set('notify_last_run', str(d_valid))
     counter = 0
     # Build the list of expiring subs
     msg = '```'
@@ -481,7 +486,7 @@ def donor_expiration(message):
         msg += tmp
     msg += '```'
     yield from client.send_message(message.author, msg)
-    msg = '```There are {} donors expiring at the end of the month.```'.format(str(counter))
+    msg = '```There are {} donors expiring at the end of the month.\nThe notify command has been last run at {}.```'.format(str(counter), str(variable_get('notify_last_run')))
     yield from client.send_message(message.author, msg)
     
             
@@ -1094,13 +1099,76 @@ def watchdog(message):
         f.write(date + " # " + message + '\n')
         f.close()
 
+# Helper function to get all mods and higher their id
+def get_management():
+    mod_ids = []
+    server = client.get_server(discord_server)
+    for member in server.members:
+        for role in member.roles:
+            if role.id in roles_admin:
+                mod_ids.append(member.id)
+    return mod_ids
+
+def variable_get(variable):
+    # Initialize db
+    db = db_connect()
+    c = db.cursor()
+
+    c.execute("SELECT value FROM system WHERE variable = '{}';".format(variable))
+    # Fetch a single row using fetchone() method.
+    d = c.fetchone()
+    if d is not None:
+        returnval = d[0]
+    else:
+        returnval = ""
+    c.close()
+    db_close(db)
+    return returnval
+
+def variable_set(variable, value):
+    # Initialize db
+    db = db_connect()
+    c = db.cursor()
+
+    c.execute("SELECT value FROM system WHERE variable = '{}';".format(variable))
+    # Fetch a single row using fetchone() method.
+    d = c.fetchone()
+    c.close()
+    db_close(db)
+    success = False
+    if d is None:
+        try:
+            db = db_connect()
+            c = db.cursor() 
+            c.execute("""INSERT INTO system (variable, value) VALUES (%s, %s)""", (variable, value))
+            db.commit()
+            c.close()
+            db_close(db)
+            success = True
+        except:
+            watchdog('something went wrong inserting the variable')
+            success = False
+    else:
+        try:
+            db = db_connect()
+            c = db.cursor() 
+            query = "UPDATE system SET value = %s WHERE variable = %S"
+            c.execute(query, (value, variable))
+            db.commit()
+            c.close()
+            db_close(db)
+            success = True
+        except:
+            watchdog('something went wrong updating the variable')
+            success = False
+    return success
 
 # Helper function to execute a query and return the results in a list object
 def db_connect():
     # Setup the db connection with the global params
     connection = MySQLdb.connect(host=sql_host, port=sql_port, user=sql_user, passwd=sql_pass, db=sql_db)
     return connection
-    
+
 def db_close(connection):
     connection.close()
 # --- End db functions ---

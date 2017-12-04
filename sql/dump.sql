@@ -31,7 +31,7 @@ CREATE TABLE `donation` (
   KEY `discord_id_index` (`discord_id`),
   KEY `amount_index` (`amt`),
   KEY `donationdate_index` (`donationdate`)
-) ENGINE=InnoDB AUTO_INCREMENT=442 DEFAULT CHARSET=utf8mb4 COMMENT='This keeps track of donations in the system';
+) ENGINE=InnoDB AUTO_INCREMENT=470 DEFAULT CHARSET=utf8mb4 COMMENT='This keeps track of donations in the system';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -87,7 +87,22 @@ CREATE TABLE `notes` (
   `note` blob,
   PRIMARY KEY (`nid`,`discord_id`),
   KEY `discord_id_index` (`discord_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COMMENT='The table containing the usernotes';
+) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COMMENT='The table containing the usernotes';
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `system`
+--
+
+DROP TABLE IF EXISTS `system`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `system` (
+  `variable` varchar(255) NOT NULL,
+  `value` text,
+  PRIMARY KEY (`variable`),
+  KEY `INDEX` (`variable`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
@@ -99,4 +114,4 @@ CREATE TABLE `notes` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2017-11-30 13:35:52
+-- Dump completed on 2017-12-03 20:12:31
