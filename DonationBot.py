@@ -477,7 +477,10 @@ def donor_expiration(message):
         counter = counter + 1
         if notify:
             user = server.get_member(d[0]) # 
-            yield from client.send_message(user, "Just a reminder that your donation covers you until the end of this month, if you would like to retain full access to the sightings channels, donor chat and all the bot commands for the next month, please follow https://www.paypal.me/FundTeamLugia to donate again. Please remember to include your discord ID!")
+            if user != None:
+                yield from client.send_message(user, "Just a reminder that your donation covers you until the end of this month, if you would like to retain full access to the sightings channels, donor chat and all the bot commands for the next month, please follow https://www.paypal.me/FundTeamLugia to donate again. Please remember to include your discord ID!")
+            else:
+                watchdog('Could not notify {}'.format(d[0]))
         tmp = str(d[1]).ljust(35) + str(d[0]) + '\n'
         if (len(tmp) + len(msg)) >  1997:
             msg += '```'
