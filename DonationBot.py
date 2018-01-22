@@ -480,9 +480,9 @@ def donor_expiration(message):
     for i, d in enumerate(data):
         counter = counter + 1
         if notify:
-            user = server.get_member(d[0]) # 
+            user = server.get_member(str(d[0])) # 
             if user != None:
-                notify_members[d[0]] = donor_expiremsg
+                notify_members[str(d[0])] = donor_expiremsg
             else:
                 watchdog('Could not notify {}'.format(d[0]))
         tmp = str(d[1]).ljust(35) + str(d[0]) + '\n'
@@ -1189,12 +1189,16 @@ def variable_set(variable, value):
         try:
             db = db_connect()
             c = db.cursor() 
-            query = "UPDATE system SET value = %s WHERE variable = %S"
+            query = "UPDATE system SET value = %s WHERE variable = %s"
             c.execute(query, (value, variable))
             db.commit()
             c.close()
             db_close(db)
             success = True
+            watchdog('Update variable {}'.format(variable))
+        except MySQLdb.Error as err:
+            watchdog(str(err))
+            success = False
         except:
             watchdog('something went wrong updating the variable')
             success = False
