@@ -10,6 +10,8 @@ import datetime
 import gc
 import traceback
 import sys
+import functools
+import random
 from datetime import date, timedelta
 from dateutil.relativedelta import relativedelta
 from time import sleep
@@ -36,6 +38,7 @@ super_admin = config.get('admin', 'admin.super').split(',')
 channels_admin = config.get('admin', 'admin.channels').split(',')
 # - donor role
 donor_role = config.get('donor', 'donor.role')
+donor_expiremsg = config.get('donor', 'donor.expiremsg')
 # - bot settings
 bot_debug = int(config.get('bot', 'bot.debug'))
 
@@ -449,6 +452,7 @@ def donor_freeloader(message):
 def donor_expiration(message):
     server = client.get_server(discord_server)
     msg = message.content.lower().split()
+    notify_members = {}
     notify = False
     if len(msg) == 3 and msg[2] == 'notify':
         notify = True
@@ -478,7 +482,7 @@ def donor_expiration(message):
         if notify:
             user = server.get_member(d[0]) # 
             if user != None:
-                yield from client.send_message(user, "Just a reminder that your donation covers you until the end of this month, if you would like to retain full access to the sightings channels, donor chat and all the bot commands for the next month, please follow https://www.paypal.me/FundTeamLugia to donate again. Please remember to include your discord ID!")
+                notify_members[d[0]] = donor_expiremsg
             else:
                 watchdog('Could not notify {}'.format(d[0]))
         tmp = str(d[1]).ljust(35) + str(d[0]) + '\n'
@@ -491,7 +495,36 @@ def donor_expiration(message):
     yield from client.send_message(message.author, msg)
     msg = '```There are {} donors expiring at the end of the month.\nThe notify command has been last run at {}.```'.format(str(counter), str(variable_get('notify_last_run')))
     yield from client.send_message(message.author, msg)
-    
+    if len(notify_members.keys()) > 0:
+        try:
+            asyncio.ensure_future(async_loop_send_messages(notify_members, 'emb'), loop=client.loop).add_done_callback(async_loop_complete_result)
+        except Exception as exc:
+            print(exc)
+
+def async_loop_send_messages(list, type):
+    server = client.get_server(discord_server)
+    counter = 0
+    # watchdog(str(list))
+    for key in list.keys():
+        if counter != 0 and counter % 5 == 0:
+            watchdog('sleep started')
+            time.sleep(random.randint(3, 12))
+            watchdog('sleep passed')
+        counter = counter + 1
+        val = list[key];
+        try:
+            usr = server.get_member(key)
+            if type == 'emb':
+                yield from client.send_message(usr, embed=val)
+            else:
+                yield from client.send_message(usr, val)
+            watchdog('send message to {} of type {}'.format(usr.name, type))
+        except Exception as exc:
+            watchdog(str(exc))
+              
+def async_loop_complete_result(future):
+    watchdog('Loop complete')
+
             
 # Helper function to remove roles from expired subscriptions
 def donor_clean(message):

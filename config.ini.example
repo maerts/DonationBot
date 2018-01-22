@@ -16,5 +16,6 @@ admin.super=205342915034087424,341730842303004673
 admin.channels=<adminchannelscommaseperated>
 [donor]
 donor.role=<donorrole>
+donor.expiremsg=Just a reminder that your donation covers you until the end of this month.
 [bot]
 bot.debug=1
