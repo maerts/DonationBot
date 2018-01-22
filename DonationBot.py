@@ -497,7 +497,7 @@ def donor_expiration(message):
     yield from client.send_message(message.author, msg)
     if len(notify_members.keys()) > 0:
         try:
-            asyncio.ensure_future(async_loop_send_messages(notify_members, 'emb'), loop=client.loop).add_done_callback(async_loop_complete_result)
+            asyncio.ensure_future(async_loop_send_messages(notify_members, 'txt'), loop=client.loop).add_done_callback(async_loop_complete_result)
         except Exception as exc:
             print(exc)
 
