@@ -562,10 +562,11 @@ def donor_contrib(message):
     server = client.get_server(discord_server)
     # Get all parameters
     smsg = message.content.lower().split()
-    if len(smsg) == 3:
+    if len(smsg) > 2:
         # Only admins can pass parameters to this function.
         if (roleacc(message, 'super') or roleacc(message, 'admin')):
-            user = smsg[2]
+            user = ' '.join(smsg[2:])
+            print(str(user))
             discordid = None
             discordname = ""
             # lookup the userid, a bit clunky but fastest way.
@@ -677,9 +678,9 @@ def donor_contrib(message):
 def donor_expire(message):
     server = client.get_server(discord_server)
     msg = message.content.lower().split()
-    if len(msg) == 3:
+    if len(msg) > 2:
         if (roleacc(message, 'super') or roleacc(message, 'admin')):
-            user = msg[2]
+            user = ' '.join(msg[2:])
             discordid = None
             discordname = ""
             # lookup the userid, a bit clunky but fastest way.
