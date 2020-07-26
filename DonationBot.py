@@ -23,7 +23,7 @@ config.read('config.ini')
 # - discord config
 discord_user = config.get('discord', 'discord.user')
 discord_pass = config.get('discord', 'discord.pass')
-discord_server = config.get('discord', 'discord.serverid')
+discord_server = int(config.get('discord', 'discord.serverid'))
 discord_bothash = config.get('discord', 'discord.bothash')
 discord_bot = int(config.get('discord', 'discord.bot'))
 # - db config
@@ -39,6 +39,11 @@ channels_admin = config.get('admin', 'admin.channels').split(',')
 # - donor role
 donor_role = config.get('donor', 'donor.role')
 donor_expiremsg = config.get('donor', 'donor.expiremsg')
+donor_enablewelcome = int(config.get('donor', 'donor.enablewelcome'))
+donor_newmsg = config.get('donor', 'donor.newmsg')
+donor_botroom = config.get('donor', 'donor.botroom')
+donor_welcomeroom = config.get('donor', 'donor.welcomeroom')
+donor_chatmods = config.get('donor', 'donor.chatmods')
 # - bot settings
 bot_debug = int(config.get('bot', 'bot.debug'))
 
@@ -46,108 +51,112 @@ bot_debug = int(config.get('bot', 'bot.debug'))
 client = discord.Client()
 
 ## Uncomment below if you want announcements on who joins the server.
-@client.async_event
-def on_member_join(member):
+@client.event
+async def on_member_join(member):
     server = member.server
     fmt = 'Welcome {0.mention} to {1.name}!'
-    # yield from client.send_message(server, fmt.format(member, server))
-    # yield from client.send_message(discord.utils.find(lambda u: u.id == member.id, client.get_all_members()), helpmsg)
+    # await client.send_message(server, fmt.format(member, server))
+    # await client.send_message(discord.utils.find(lambda u: u.id == member.id, client.get_all_members()), helpmsg)
     # print('Sent intro message to '+ member.name)
 
-@client.async_event
-def on_ready():
+@client.event
+async def on_ready():
     watchdog('Connected! Ready to notify.')
     watchdog('Username: ' + client.user.name)
-    watchdog('ID: ' + client.user.id)
+    watchdog('ID: ' + str(client.user.id))
     watchdog('--Server List--')
-    for server in client.servers:
+    for server in client.guilds:
         discord_server = server.id
-        watchdog(server.id + ': ' + server.name)
+        watchdog(str(server.id) + ': ' + server.name)
         for role in server.roles:
-            watchdog(role.name + ': ' + role.id)
-    
+            watchdog(role.name + ': ' + str(role.id))
+
 
 # --- Help messages ---
-# The !help message for normal users
+# The .help message for normal users
 helpmsg = "\n\
 Commands\n\
 \n\
-`!donor expire` if you have donated and are process by the system you can check until when you're a donor. Donate before the expiration date to continue your subscription. \n\
-`!donor contrib` list all the months added in your name. \n\
+`.donor expire` if you have donated and are process by the system you can check until when you're a donor. Donate before the expiration date to continue your subscription. \n\
+`.donor contrib` list all the months added in your name. \n\
 "
 
-# The !help message for admin users
+# The .help message for admin users
 helpamsg = "\n\n\
 Admin commands\n\
 \n\
-`!donor add {user} {#months}` this will add a new user and a contribution or add a contribution and update the valid date on a donor.\n\
+`.donor add {user} {#months}` this will add a new user and a contribution or add a contribution and update the valid date on a donor.\n\
 If today is not the 25th of the month or later, it will count as a donation for this month, if it is made after it will start counting from next month.\n\
-e.g. if today is the 19th of september and you type `!donor add nickname 1` it will count towards the end of september. If it is the 25th of September it will count towards the end of October.\n\
-`!donor expire {user}` find out the expiration for a user. \n\
-`!donor contrib {user}` find out all months added to a user with the date.\n\
-`!donor change {olduser} {newuser}` update an existing user to a new user.\n\
-`!donor subs` will list all users in the database with a valid subscription and when it runs out.\n\
-`!donor stats` will give a short list with information about donor numbers.\n\
-`!donor expiration` will list all users whose subscription runs out at the end of this month.\n\
-`!donor freeloader` will list all users whose subscription has run out but that still have the Donor role.\n\
-`!note add {user} {note}` will add a note to a user that only mods & admins can access.\n\
-`!note del {id}` will delete a note from the database.\n\
-`!note list {user}` will list all notes or the notes for a specific user when provided.\n\
+e.g. if today is the 19th of september and you type `.donor add nickname 1` it will count towards the end of september. If it is the 25th of September it will count towards the end of October.\n\
+`.donor remove {user} {#months}` removes months from a given users.\n\
+`.donor expire {user}` find out the expiration for a user. \n\
+`.donor contrib {user}` find out all months added to a user with the date.\n\
+`.donor change {olduser} {newuser}` update an existing user to a new user.\n\
+`.donor subs` will list all users in the database with a valid subscription and when it runs out.\n\
+`.donor stats` will give a short list with information about donor numbers.\n\
+`.donor expiration` will list all users whose subscription runs out at the end of this month.\n\
+`.donor freeloader` will list all users whose subscription has run out but that still have the Donor role.\n\
+`.note add {user} {note}` will add a note to a user that only mods & admins can access.\n\
+`.note del {id}` will delete a note from the database.\n\
+`.note list {user}` will list all notes or the notes for a specific user when provided.\n\
 "
 # The message shown for unprivileged users
 helpsamsg = "\n\n\
 Super Admin commands\n\
 \n\
-`!donor clean` remove all the Donor role from expired contributors.\n\
-`!donor expiration notify` it does the same as `!donor expiration` with the addition of sending all expirees a DM about their expiration.\n\
+`.donor clean` remove all the Donor role from expired contributors.\n\
+`.donor expiration notify` it does the same as `.donor expiration` with the addition of sending all expirees a DM about their expiration.\n\
 "
 # --- End help messages ---
 
-@client.async_event
-def on_message(message):
-    if '!donor help' == message.content[0:11]:
+@client.event
+async def on_message(message):
+    if '.donor help' == message.content[0:11]:
         returnmsg = helpmsg
         if roleacc(message, 'super') or roleacc(message, 'admin'):
             returnmsg += helpamsg
         if roleacc(message, 'super'):
             returnmsg += helpsamsg
-        if message.channel.is_private:
-            yield from client.send_message(message.channel, returnmsg)
+        if str(message.channel.type) == 'text':
+            channel = message.channel
+            await channel.send(returnmsg)
         else:
-            server = client.get_server(discord_server)
+            server = client.get_guild(discord_server)
             usr = server.get_member(message.author.id)
-            yield from client.send_message(usr, returnmsg)
-        
-    if '!donor add' == message.content[0:10] and (roleacc(message, 'super') or roleacc(message, 'admin')):
-        yield from donor_add(message)
-    if '!donor expiration' == message.content[0:17] and (roleacc(message, 'super') or roleacc(message, 'admin')):
-        yield from donor_expiration(message)
-    if '!donor subs' == message.content[0:11] and (roleacc(message, 'super') or roleacc(message, 'admin')):
-        yield from donor_subs(message)
-    if '!donor clean' == message.content[0:12] and roleacc(message, 'super'):
-        yield from donor_clean(message)
-    if '!donor contrib' == message.content[0:14]:
-        yield from donor_contrib(message)
-    if '!donor change' == message.content[0:13] and (roleacc(message, 'super') or roleacc(message, 'admin')):
-        yield from donor_change(message)
-    if '!donor expire' == message.content[0:13]:
-        yield from donor_expire(message)
-    if '!donor freeloader' == message.content[0:17] and (roleacc(message, 'super') or roleacc(message, 'admin')):
-        yield from donor_freeloader(message)
-    if '!donor stats' == message.content[0:17] and (roleacc(message, 'super') or roleacc(message, 'admin')):
-        yield from donor_stats(message)
-    if '!note add' == message.content[0:9] and (roleacc(message, 'super') or roleacc(message, 'admin')):
-        yield from note_add(message)
-    if '!note del' == message.content[0:9] and (roleacc(message, 'super') or roleacc(message, 'admin')):
-        yield from note_del(message)
-    if '!note list' == message.content[0:10] and (roleacc(message, 'super') or roleacc(message, 'admin')):
-        yield from note_list(message)
+            await usr.send(returnmsg)
+
+    if '.donor add' == message.content[0:10] and (roleacc(message, 'super') or roleacc(message, 'admin')):
+        await donor_add(message)
+    if '.donor remove' == message.content[0:13] and (roleacc(message, 'super') or roleacc(message, 'admin')):
+        await donor_remove(message)
+    if '.donor expiration' == message.content[0:17] and (roleacc(message, 'super') or roleacc(message, 'admin')):
+        await donor_expiration(message)
+    if '.donor subs' == message.content[0:11] and (roleacc(message, 'super') or roleacc(message, 'admin')):
+        await donor_subs(message)
+    if '.donor clean' == message.content[0:12] and roleacc(message, 'super'):
+        await donor_clean(message)
+    if '.donor contrib' == message.content[0:14]:
+        await donor_contrib(message)
+    if '.donor change' == message.content[0:13] and (roleacc(message, 'super') or roleacc(message, 'admin')):
+        await donor_change(message)
+    if '.donor expire' == message.content[0:13]:
+        await donor_expire(message)
+    if '.donor freeloader' == message.content[0:17] and (roleacc(message, 'super') or roleacc(message, 'admin')):
+        await donor_freeloader(message)
+    if '.donor stats' == message.content[0:17] and (roleacc(message, 'super') or roleacc(message, 'admin')):
+        await donor_stats(message)
+    if '.note add' == message.content[0:9] and (roleacc(message, 'super') or roleacc(message, 'admin')):
+        await note_add(message)
+    if '.note del' == message.content[0:9] and (roleacc(message, 'super') or roleacc(message, 'admin')):
+        await note_del(message)
+    if '.note list' == message.content[0:10] and (roleacc(message, 'super') or roleacc(message, 'admin')):
+        await note_list(message)
 
 ##################################################
 # -- Note functions --
 # Helper function to check your donation expiration
-def note_add(message):
-    server = client.get_server(discord_server)
+async def note_add(message):
+    server = client.get_guild(discord_server)
     msg = message.content.lower().split()
     if len(msg) > 3:
         db = db_connect()
@@ -171,13 +180,14 @@ def note_add(message):
             dup_msg += "\n".rjust(35, '-')
             for i, member in enumerate(duplicatemembers):
                 dup_msg += str(i + 1) + ". **" + member.name + "#" + member.discriminator + "** (" + member.id + ")\n"
-            yield from client.send_message(message.channel, dup_msg)
+            channel = message.channel
+            await channel.send(dup_msg)
         else:
             if discordid is not None:
                 # verify existence of rol on the server
                 success = False
                 try:
-                
+
                     c.execute("""INSERT INTO notes (discord_id, reporter_id, startdate, note) VALUES (%s, %s, %s, %s)""", (discordid, message.author.id, now, " ".join(note)))
                     db.commit()
                     success = True
@@ -186,25 +196,28 @@ def note_add(message):
                     watchdog("INSERT ERROR: " + str(e))
                 c.close()
                 db_close(db)
+                channel = message.channel
                 if success:
-                    yield from client.send_message(message.channel, "A note has been recorded for `{}`.".format(discordname))
+                    await channel.send("A note has been recorded for `{}`.".format(discordname))
                 else:
-                    yield from client.send_message(message.channel, "Something went wrong trying to add a note for `{}`.".format(discordname))
+                    await channel.send("Something went wrong trying to add a note for `{}`.".format(discordname))
     else:
-        yield from client.send_message(message.channel, "Wrong usage! `!note add user this guy is awesome`")
+        channel = message.channel
+        await channel.send("Wrong usage! `.note add user this guy is awesome`")
 
-def note_del(message):
-    server = client.get_server(discord_server)
+async def note_del(message):
+    server = client.get_guild(discord_server)
     msg = message.content.lower().split()
+    channel = message.channel
     if len(msg) == 3:
         db = db_connect()
         c = db.cursor()
-        nid = msg[2]
+        nid = int(msg[2])
 
         # verify existence of rol on the server
         deleted = 0
         try:
-            c.execute("""DELETE FROM notes WHERE nid=%s""", (nid))
+            c.execute("""DELETE FROM notes WHERE nid=%s""", (nid,))
             deleted = c.rowcount
             db.commit()
         except MySQLdb.Error as e:
@@ -213,15 +226,16 @@ def note_del(message):
         c.close()
         db_close(db)
         if deleted > 0:
-            yield from client.send_message(message.channel, "Note with id `{}` has been removed.".format(nid))
+            await channel.send("Note with id `{}` has been removed.".format(nid))
         else:
-            yield from client.send_message(message.channel, "Something went wrong trying to delete note with id `{}`.".format(nid))
+            await channel.send("Something went wrong trying to delete note with id `{}`.".format(nid))
     else:
-        yield from client.send_message(message.channel, "Wrong usage! `!note del 123` where 123 is the note number")
+        await channel.send("Wrong usage! `.note del 123` where 123 is the note number")
 
-def note_list(message):
-    server = client.get_server(discord_server)
+async def note_list(message):
+    server = client.get_guild(discord_server)
     msg = message.content.lower().split()
+    channel = message.channel
     if len(msg) >= 3:
         db = db_connect()
         c = db.cursor()
@@ -244,7 +258,7 @@ def note_list(message):
             dup_msg += "\n".rjust(35, '-')
             for i, member in enumerate(duplicatemembers):
                 dup_msg += str(i + 1) + ". **" + member.name + "#" + member.discriminator + "** (" + member.id + ")\n"
-            yield from client.send_message(message.channel, dup_msg)
+            await channel.send(dup_msg)
         else:
             if discordid is not None:
                 # verify existence of rol on the server
@@ -252,7 +266,7 @@ def note_list(message):
                 data = c.fetchall()
                 c.close()
                 db_close(db)
-                
+
                 msg = '```'
                 msg += 'Notes for {}\n'.format(discordname)
                 msg += '\n'.rjust(50, '-')
@@ -269,9 +283,9 @@ def note_list(message):
                     msg += d_nid + d_date + d_by + d[4].decode('ascii') + '\n'
                 msg += '```'
                 return_channel = message.channel
-                if return_channel.name not in channels_admin and not return_channel.is_private:
-                    return_channel = message.author
-                yield from client.send_message(return_channel, msg)
+                if return_channel.name not in channels_admin and str(message.channel.type) == 'text':
+                    return_channel = server.get_member(message.author.id)
+                await return_channel.send(msg)
     else:
         db = db_connect()
         c = db.cursor()
@@ -303,18 +317,18 @@ def note_list(message):
             msg += d_nid + d_date + d_for + d_by + d[4].decode('ascii') + '\n'
         msg += '```'
         return_channel = message.channel
-        if return_channel.name not in channels_admin and not return_channel.is_private:
-            return_channel = message.author
-        yield from client.send_message(return_channel, msg)
+        if return_channel.name not in channels_admin and str(message.channel.type) == 'text':
+            return_channel = server.get_member(message.author.id)
+        await return_channel.send(msg)
 
 # -- End note functions --
 
 
 # -- Donor functions --
 # Helper function to get all active subscribers
-def donor_stats(message):
+async def donor_stats(message):
     # Current time
-    now = int(time.time())    
+    now = int(time.time())
     mod_ids = get_management()
     print(mod_ids)
     # get all donors with a valid date higher than now
@@ -326,7 +340,7 @@ def donor_stats(message):
     data = c.fetchall()
     c.close()
     db_close(db)
-    
+
     forecast = {}
     for i, d in enumerate(data):
         for key in forecast.keys():
@@ -334,8 +348,8 @@ def donor_stats(message):
             forecast[key] = tmp + int(d[1])
         forecast[str(d[0])] = int(d[1])
     s_forecast = [(k, forecast[k]) for k in sorted(forecast, key=forecast.get, reverse=True)]
-    
-    
+
+
     # get the mount of donors.
     db = db_connect()
     c = db.cursor()
@@ -353,10 +367,12 @@ def donor_stats(message):
     for k, v in s_forecast:
         msg+= k.ljust(25) + str(v) + '\n'
     msg += '```'
-    yield from client.send_message(message.channel, msg)
+    channel = message.channel
+    await channel.send(msg)
 
 # Helper function to get all active subscribers
-def donor_subs(message):
+async def donor_subs(message):
+    server = client.get_guild(discord_server)
     # Current time
     now = int(time.time())
     # get all donors with a valid date higher than now
@@ -366,7 +382,7 @@ def donor_subs(message):
     data = c.fetchall()
     c.close()
     db_close(db)
-    
+
     # get the mount of donors.
     db = db_connect()
     c = db.cursor()
@@ -374,6 +390,8 @@ def donor_subs(message):
     amount = c.fetchone()
     c.close()
     db_close(db)
+
+    return_channel = server.get_member(message.author.id)
 
     # Build the list of subs
     msg = '```'
@@ -385,15 +403,15 @@ def donor_subs(message):
         tmp = str(d[1]).ljust(40) + str(datetime.date.fromtimestamp(int(d[3]))).ljust(20) + str(d[0]) + '\n'
         if (len(tmp) + len(msg)) >  1997:
             msg += '```'
-            yield from client.send_message(message.author, msg)
+            await return_channel.send(msg)
             msg = '```'
         msg += tmp
     msg += '```'
-    yield from client.send_message(message.author, msg)
+    await return_channel.send(msg)
 
 # Helper function to check your expiring members' subs
-def donor_freeloader(message):
-    server = client.get_server(discord_server)
+async def donor_freeloader(message):
+    server = client.get_guild(discord_server)
     # Get the last day of this month.
     d_valid = int(time.time())
     # verify existence of discordid on the server
@@ -403,7 +421,7 @@ def donor_freeloader(message):
     data = c.fetchall()
     c.close()
     db_close(db)
-    
+
     valid = []
     for i, d in enumerate(data):
         valid.append(str(d[0]))
@@ -414,12 +432,13 @@ def donor_freeloader(message):
     data = c.fetchall()
     c.close()
     db_close(db)
-    
+
     expired = {}
     for i, d in enumerate(data):
         expired[str(d[0])] = str(datetime.date.fromtimestamp(int(d[3])))
 
-        
+    return_channel = server.get_member(message.author.id)
+
     # Build the list of expiring subs
     msg = '```'
     counter = 0
@@ -439,18 +458,18 @@ def donor_freeloader(message):
             tmp = str(name).ljust(50) + expired_date.ljust(15) + member.id + '\n'
             if (len(tmp) + len(msg)) >  1997:
                 msg += '```'
-                yield from client.send_message(message.author, msg)
+                await return_channel.send(msg)
                 msg = '```'
             msg += tmp
     msg += '```'
-    yield from client.send_message(message.author, msg)
+    await return_channel.send(msg)
     msg = "```A total of {} members have the donor status but aren't in the bot.```".format(str(counter))
-    yield from client.send_message(message.author, msg)
+    await return_channel.send(msg)
 
-            
+
 # Helper function to check your expiring members' subs
-def donor_expiration(message):
-    server = client.get_server(discord_server)
+async def donor_expiration(message):
+    server = client.get_guild(discord_server)
     msg = message.content.lower().split()
     notify_members = {}
     notify = False
@@ -468,6 +487,8 @@ def donor_expiration(message):
     c.close()
     db_close(db)
 
+    return_channel = server.get_member(message.author.id)
+
     if notify:
         variable_set('notify_last_run', str(d_valid))
     counter = 0
@@ -480,7 +501,7 @@ def donor_expiration(message):
     for i, d in enumerate(data):
         counter = counter + 1
         if notify:
-            user = server.get_member(str(d[0])) # 
+            user = server.get_member(str(d[0])) #
             if user != None:
                 notify_members[str(d[0])] = donor_expiremsg
             else:
@@ -488,22 +509,25 @@ def donor_expiration(message):
         tmp = str(d[1]).ljust(35) + str(d[0]) + '\n'
         if (len(tmp) + len(msg)) >  1997:
             msg += '```'
-            yield from client.send_message(message.author, msg)
+            await return_channel.send(msg)
             msg = '```'
         msg += tmp
     msg += '```'
-    yield from client.send_message(message.author, msg)
+    await return_channel.send(msg)
     msg = '```There are {} donors expiring at the end of the month.\nThe notify command has been last run at {}.```'.format(str(counter), str(variable_get('notify_last_run')))
-    yield from client.send_message(message.author, msg)
+    await return_channel.send(msg)
     if len(notify_members.keys()) > 0:
         try:
             asyncio.ensure_future(async_loop_send_messages(notify_members, 'txt'), loop=client.loop).add_done_callback(async_loop_complete_result)
         except Exception as exc:
             print(exc)
 
-def async_loop_send_messages(list, type):
-    server = client.get_server(discord_server)
+async def async_loop_send_messages(list, type):
+    server = client.get_guild(discord_server)
     counter = 0
+
+    return_channel = server.get_member(message.author.id)
+
     # watchdog(str(list))
     for key in list.keys():
         if counter != 0 and counter % 5 == 0:
@@ -515,21 +539,22 @@ def async_loop_send_messages(list, type):
         try:
             usr = server.get_member(key)
             if type == 'emb':
-                yield from client.send_message(usr, embed=val)
+                await return_channel.send(embed=val)
             else:
-                yield from client.send_message(usr, val)
+                await return_channel.send(val)
             watchdog('send message to {} of type {}'.format(usr.name, type))
         except Exception as exc:
             watchdog(str(exc))
-              
+
 def async_loop_complete_result(future):
     watchdog('Loop complete')
 
-            
+
 # Helper function to remove roles from expired subscriptions
-def donor_clean(message):
+async def donor_clean(message):
     current_date = int(time.time())
-    server = client.get_server(discord_server)
+    server = client.get_guild(discord_server)
+    return_channel = server.get_member(message.author.id)
     # verify existence of discordid on the server
     db = db_connect()
     c = db.cursor()
@@ -537,7 +562,7 @@ def donor_clean(message):
     data = c.fetchall()
     c.close()
     db_close(db)
-    
+
     msg = '```'
     msg += 'Coroutine to remove the donor role from expired members\n'
     msg += ''.ljust(55, '-') + '\n'
@@ -549,7 +574,7 @@ def donor_clean(message):
             if member.id == d[0]:
                 try:
                     role = discord.utils.get(server.roles, name=donor_role)
-                    yield from client.remove_roles(member, role)
+                    await client.remove_roles(member, role)
                     tmp = '- {} removed from {}\n'.format(member.name, donor_role)
                     if bot_debug == 1:
                         tmp = 'Debug: Member {} should be removed now.\n'.format(d[1])
@@ -558,7 +583,7 @@ def donor_clean(message):
                 break
             if (len(tmp) + len(msg)) >  1997:
                 msg += '```'
-                yield from client.send_message(message.author, msg)
+                await return_channel.send(msg)
                 msg = '```'
             msg += tmp
 
@@ -569,7 +594,7 @@ def donor_clean(message):
     data = c.fetchall()
     c.close()
     db_close(db)
-    
+
     valid = []
     for i, d in enumerate(data):
         valid.append(str(d[0]))
@@ -579,7 +604,7 @@ def donor_clean(message):
             watchdog(member.name + '#' + member.discriminator + ' - ' + member.id)
             try:
                 role = discord.utils.get(server.roles, name=donor_role)
-                yield from client.remove_roles(member, role)
+                await client.remove_roles(member, role)
                 tmp = '- {} removed from {}\n'.format(member.name + '#' + member.discriminator + ' (' + member.id + ')', donor_role)
                 if bot_debug == 1:
                     watchdog('Debug: Member {} should be removed now.\n'.format(d[1]))
@@ -587,16 +612,17 @@ def donor_clean(message):
                 tmp = '# An error occured try to remove {} removed from {}\n'.format(member.name, donor_role)
             if (len(tmp) + len(msg)) >  1997:
                 msg += '```'
-                yield from client.send_message(message.author, msg)
+                await return_channel.send(msg)
                 msg = '```'
             msg += tmp
     msg += '```'
-    yield from client.send_message(message.author, msg)
+    await return_channel.send(msg)
 
 # Helper function to check contributions
-def donor_contrib(message):
-    server = client.get_server(discord_server)
+async def donor_contrib(message):
+    server = client.get_guild(discord_server)
     # Get all parameters
+    channel = message.channel
     smsg = message.content.lower().split()
     if len(smsg) > 2:
         # Only admins can pass parameters to this function.
@@ -619,7 +645,7 @@ def donor_contrib(message):
                 dup_msg += "\n".rjust(35, '-')
                 for i, member in enumerate(duplicatemembers):
                     dup_msg += str(i + 1) + ". **" + member.name + "#" + member.discriminator + "** (" + member.id + ")\n"
-                yield from client.send_message(message.channel, dup_msg)
+                await channel.send(dup_msg)
             else:
                 if discordid is not None:
                     # verify existence of rol on the server
@@ -630,7 +656,7 @@ def donor_contrib(message):
                     c.close()
                     db_close(db)
                     if row is None:
-                        yield from client.send_message(message.channel, "Contribution information for member `{}` can't be found in the system.".format(discordname))                
+                        await channel.send("Contribution information for member `{}` can't be found in the system.".format(discordname))
                     else:
                         startdate = str(datetime.date.fromtimestamp(int(row[2])))
                         validdate = str(datetime.date.fromtimestamp(int(row[3])))
@@ -651,19 +677,19 @@ def donor_contrib(message):
                         msg += '----------------------\n'
                         for i, d in enumerate(data):
                             msg += str(d[2]).ljust(12) + str(datetime.date.fromtimestamp(int(d[3]))) + '\n'
-                        
+
                         msg += '```'
-                        yield from client.send_message(message.channel, msg)
+                        await channel.send(msg)
 
                         return_channel = message.channel
-                        if return_channel.name in channels_admin or return_channel.is_private:
+                        if return_channel.name in channels_admin or str(message.channel.type) != 'text':
                             db = db_connect()
                             c = db.cursor()
                             c.execute("SELECT * FROM notes WHERE discord_id = '{}' ORDER BY nid ASC;".format(discordid))
                             data = c.fetchall()
                             c.close()
                             db_close(db)
-                            
+
                             note_cnt = 0
                             msg = '```'
                             msg += 'Notes for {}\n'.format(discordname)
@@ -682,12 +708,12 @@ def donor_contrib(message):
                                 msg += d_nid + d_date + d_by + d[4].decode('ascii') + '\n'
                             msg += '```'
                             if note_cnt > 0:
-                                yield from client.send_message(return_channel, msg)
+                                await return_channel.send(msg)
                 else:
-                    yield from client.send_message(message.channel, "Unfortunately member `{}` can't be found in the system, check the spelling or try finding it by id.".format(user))
+                    await channel.send("Unfortunately member `{}` can't be found in the system, check the spelling or try finding it by id.".format(user))
         else:
-            yield from client.send_message(message.channel, "You don't have permissions to lookup other members' expiration date.")
-    else: 
+            await channel.send("You don't have permissions to lookup other members' expiration date.")
+    else:
       discordid = message.author.id
       # verify existence of discordid on the server
       db = db_connect()
@@ -707,13 +733,14 @@ def donor_contrib(message):
       else:
           msg+= 'There is no contribution information for your user'
       msg += '```'
-      
-      yield from client.send_message(message.author, msg)
+      return_channel = server.get_member(message.author.id)
+      await return_channel.send(msg)
 
 # Helper function to check your donation expiration
-def donor_expire(message):
-    server = client.get_server(discord_server)
+async def donor_expire(message):
+    server = client.get_guild(discord_server)
     msg = message.content.lower().split()
+    channel = message.channel
     if len(msg) > 2:
         if (roleacc(message, 'super') or roleacc(message, 'admin')):
             user = ' '.join(msg[2:])
@@ -733,7 +760,7 @@ def donor_expire(message):
                 dup_msg += "\n".rjust(35, '-')
                 for i, member in enumerate(duplicatemembers):
                     dup_msg += str(i + 1) + ". **" + member.name + "#" + member.discriminator + "** (" + member.id + ")\n"
-                yield from client.send_message(message.channel, dup_msg)
+                await channel.send(dup_msg)
             else:
                 if discordid is not None:
                     # verify existence of rol on the server
@@ -745,9 +772,9 @@ def donor_expire(message):
                     db_close(db)
                     if row is not None:
                         validity = int(row[3])
-                        yield from client.send_message(message.channel, "The subscription for `{}` will expire on `{}`.".format(discordname, str(datetime.date.fromtimestamp(validity))))
+                        await channel.send("The subscription for `{}` will expire on `{}`.".format(discordname, str(datetime.date.fromtimestamp(validity))))
                         return_channel = message.channel
-                        if return_channel.name in channels_admin or return_channel.is_private:
+                        if return_channel.name in channels_admin or str(message.channel.type) != 'text':
                             db = db_connect()
                             c = db.cursor()
                             c.execute("SELECT * FROM notes WHERE discord_id = '{}' ORDER BY nid ASC;".format(discordid))
@@ -773,12 +800,12 @@ def donor_expire(message):
                                 msg += d_nid + d_date + d_by + d[4].decode('ascii') + '\n'
                             msg += '```'
                             if note_cnt > 0:
-                                yield from client.send_message(return_channel, msg)
+                                await message_channel.send(msg)
                     else:
-                        yield from client.send_message(message.channel, "Unfortunately member `{}` can't be found in the system, check the spelling or try finding it by id.".format(user))
+                        await channel.send("Unfortunately member `{}` can't be found in the system, check the spelling or try finding it by id.".format(user))
         else:
-            yield from client.send_message(message.channel, "You don't have permissions to lookup other members' expiration date.")
-    else: 
+            await channel.send("You don't have permissions to lookup other members' expiration date.")
+    else:
       discordid = message.author.id
       # verify existence of rol on the server
       db = db_connect()
@@ -791,29 +818,31 @@ def donor_expire(message):
       # If the donor exists, add a payment & update the validity
       if row is not None:
           validity = int(row[3])
-          yield from client.send_message(message.author, "Your subscription will expire on `{}`.".format(str(datetime.date.fromtimestamp(validity))))
+          return_channel = server.get_member(message.author.id)
+          await return_channel.send("Your subscription will expire on `{}`.".format(str(datetime.date.fromtimestamp(validity))))
       else:
-          yield from client.send_message(message.channel, "Unfortunately you are not known in the system, please contact a moderator if you have donated.")
+          await channel.send("Unfortunately you are not known in the system, please contact a moderator if you have donated.")
 
 # Function to change a donor account to a new account
-def donor_change(message):
-    server = client.get_server(discord_server)
+async def donor_change(message):
+    server = client.get_guild(discord_server)
+    channel = message.channel
     msg = message.content.lower().split()
     if len(msg) < 4:
-        yield from client.send_message(message.channel, "You are missing a parameter to the command, please verify and retry.")
+        await channel.send("You are missing a parameter to the command, please verify and retry.")
     else:
         # instance of server for later use
-        server = client.get_server(discord_server)
+        server = client.get_guild(discord_server)
         # We expect these values.
         user = msg[2]
         newuser = msg[3]
         if user == newuser:
-            yield from client.send_message(message.channel, "Both ID's must be different from eachother.")
+            await channel.send("Both ID's must be different from eachother.")
             return
         # Member objects for later use
         omember = None
         nmember = None
-        
+
         # discordid
         odiscordid = None
         ndiscordid = None
@@ -861,7 +890,7 @@ def donor_change(message):
                     c = db.cursor()
                     try:
                         c.execute ("""UPDATE donor SET discord_id=%s, init=%s WHERE discord_id=%s""", (ndiscordid, init, oldmember))
-                        db.commit() 
+                        db.commit()
                     except:
                         db.rollback()
                     c.close()
@@ -869,27 +898,28 @@ def donor_change(message):
                     try:
                         # Add roles to new user
                         role = discord.utils.get(server.roles, name=donor_role)
-                        yield from client.add_roles(nmember, role)
+                        await client.add_roles(nmember, role)
                         watchdog('Debug: Member {} updated to {}'.format(omember.name, nmember.name))
                     except:
                         watchdog('Error occured: Member {} not updated to {}'.format(omember.name, nmember.name))
-                        yield from client.send_message(message.channel, "There was an error trying to update member subscription from `{}` to `{}`.".format(omember.name, nmember.name))
-                    yield from client.send_message(message.channel, "Updated member subscription from `{}` to `{}`.".format(omember.name, nmember.name))
+                        await channel.send("There was an error trying to update member subscription from `{}` to `{}`.".format(omember.name, nmember.name))
+                    await channel.send("Updated member subscription from `{}` to `{}`.".format(omember.name, nmember.name))
                 else:
-                    yield from client.send_message(message.channel, "There was a problem adding a donation for donor `{}`. Contact an admin if this problem persists".format(discordname))
+                    await channel.send("There was a problem adding a donation for donor `{}`. Contact an admin if this problem persists".format(discordname))
             # If the donor doesn't exist, create a new entry for the donors, calculate the validity & add a payment
             else:
-                yield from client.send_message(message.channel, "This user you're trying to change isn't a donor yet, try adding the user through the `add` command".format(user))
+                await channel.send("This user you're trying to change isn't a donor yet, try adding the user through the `add` command".format(user))
         else:
-            yield from client.send_message(message.channel, "One of the users couldn't be found, try again with different parameters".format(user))
+            await channel.send("One of the users couldn't be found, try again with different parameters".format(user))
 
-            
+
 # Function to add monitored channels to the database
-def donor_add(message):
-    server = client.get_server(discord_server)
+async def donor_add(message):
+    server = client.get_guild(discord_server)
+    channel = message.channel
     msg = message.content.lower().split()
     if len(msg) < 4:
-        yield from client.send_message(message.channel, "You are missing a parameter to the command, please verify and retry.")
+        await channel.send("You are missing a parameter to the command, please verify and retry.")
     else:
         # instance of server for later use
         # We expect these values.
@@ -914,7 +944,7 @@ def donor_add(message):
             dup_msg += "\n".rjust(35, '-')
             for i, member in enumerate(duplicatemembers):
                 dup_msg += str(i + 1) + ". **" + member.name + "#" + member.discriminator + "** (" + member.id + ")\n"
-            yield from client.send_message(message.channel, dup_msg)
+            await channel.send(dup_msg)
         else:
             if discordid is not None:
                 # verify existence of rol on the server
@@ -930,7 +960,7 @@ def donor_add(message):
                     created = int(time.time())
                     old_valid = int(row[3])
                     valid = new_valid_time(old_valid, month)
-                    
+
                     db = db_connect()
                     c = db.cursor()
                     donationadded = False
@@ -949,7 +979,7 @@ def donor_add(message):
                         c = db.cursor()
                         try:
                             c.execute ("""UPDATE donor SET validdate=%s WHERE discord_id=%s""", (valid, discordid))
-                            db.commit() 
+                            db.commit()
                         except:
                             db.rollback()
                         c.close()
@@ -957,16 +987,16 @@ def donor_add(message):
                         if old_valid < created:
                             try:
                                 role = discord.utils.get(server.roles, name=donor_role)
-                                yield from client.add_roles(discordmember, role)
+                                await client.add_roles(discordmember, role)
                             except Exception:
                                 watchdog(traceback.format_exc())
                                 watchdog(sys.exc_info()[0])
                                 if bot_debug == 1:
                                     watchdog('Debug: Member {} should be added now'.format(discordname))
-                                yield from client.send_message(message.channel, "There was an error trying to add `{}` to the `{}`.".format(discordname, donor_role))
-                        yield from client.send_message(message.channel, "Added a contribution for `{} months` for user `{}` it will expire at `{}`".format(month, discordname, str(datetime.date.fromtimestamp(valid))))
+                                await channel.send("There was an error trying to add `{}` to the `{}`.".format(discordname, donor_role))
+                        await channel.send("Added a contribution for `{} months` for user `{}` it will expire at `{}`".format(month, discordname, str(datetime.date.fromtimestamp(valid))))
                     else:
-                        yield from client.send_message(message.channel, "There was a problem adding a donation for donor `{}`. Contact an admin if this problem persists".format(discordname))
+                        await channel.send("There was a problem adding a donation for donor `{}`. Contact an admin if this problem persists".format(discordname))
                 # If the donor doesn't exist, create a new entry for the donors, calculate the validity & add a payment
                 else:
                     created = int(time.time())
@@ -984,7 +1014,7 @@ def donor_add(message):
                         watchdog(str(e))
                     c.close()
                     db_close(db)
-                    
+
                     if donoradded:
                         db = db_connect()
                         c = db.cursor()
@@ -1003,27 +1033,121 @@ def donor_add(message):
                             role = discord.utils.get(server.roles, name=donor_role)
                             watchdog(str(role.name) + ' - ' + str(role.id))
                             try:
-                                yield from client.add_roles(discordmember, role)
+                                await client.add_roles(discordmember, role)
                             except Exception:
                                 watchdog(traceback.format_exc())
                                 watchdog(sys.exc_info()[0])
                                 if bot_debug == 1:
                                     watchdog('Member {} could not be added'.format(discordname))
-                                yield from client.send_message(message.channel, "Forbidden error: There was an error trying to add `{}` to the `{}`.".format(discordname, donor_role))
-                            yield from client.send_message(message.channel, "Added donor `{}` to the database with a first contribution for `{} months`".format(discordname, month))
+                                await channel.send("Forbidden error: There was an error trying to add `{}` to the `{}`.".format(discordname, donor_role))
+                            await channel.send("Added donor `{}` to the database with a first contribution for `{} months`".format(discordname, month))
+                            if donor_enablewelcome == 1:
+                                welcome = None
+                                for member in server.members:
+                                    if member.id == discordid:
+                                        usr = member
+                                for channel in server.channels:
+                                    if channel.name == donor_botroom:
+                                        chan = channel
+                                    if channel.name == donor_welcomeroom:
+                                        welcome = channel
+                                for role in server.roles:
+                                    if role.name == donor_chatmods:
+                                        mod = role
+                                if welcome != None:
+                                    await welcome.send(donor_newmsg.format(usr, chan, mod))
                         else:
-                            yield from client.send_message(message.channel, "There was a problem adding a donation for donor `{}`. Contact an admin if this problem persists".format(user))
+                            await channel.send("There was a problem adding a donation for donor `{}`. Contact an admin if this problem persists".format(user))
                     else:
-                        yield from client.send_message(message.channel, "An error occurred adding donor `{}` to the database, try again later or contact and administrator".format(user))
+                        await channel.send("An error occurred adding donor `{}` to the database, try again later or contact and administrator".format(user))
             else:
-                yield from client.send_message(message.channel, "An error occurred trying to add donor `{}` to the database".format(user))
+                await channel.send("An error occurred trying to add donor `{}` to the database".format(user))
 
+
+# Function to remove months from a user.
+async def donor_remove(message):
+    server = client.get_guild(discord_server)
+    channel = message.channel
+    msg = message.content.lower().split()
+    if len(msg) < 4:
+        await channel.send("You are missing a parameter to the command, please verify and retry.")
+    else:
+        # instance of server for later use
+        # We expect these values.
+        user = msg[2]
+        month = msg[3]
+
+        discordid = None
+        discordname = ""
+        discordmember = None
+        # lookup the userid, a bit clunky but fastest way.
+        count = 0
+        duplicatemembers = []
+        for member in server.members:
+            if user_lookup(member, user):
+               discordid = member.id
+               discordname = member.name
+               discordmember = member
+               count = count + 1
+               duplicatemembers.append(member)
+        if count > 1:
+            dup_msg = "I have discovered multiple users with this name.\nVerify and try it with the discriminator or id.\n"
+            dup_msg += "\n".rjust(35, '-')
+            for i, member in enumerate(duplicatemembers):
+                dup_msg += str(i + 1) + ". **" + member.name + "#" + member.discriminator + "** (" + member.id + ")\n"
+            await channel.send(dup_msg)
+        else:
+            if discordid is not None:
+                # verify existence of rol on the server
+                db = db_connect()
+                c = db.cursor()
+                c.execute("SELECT * FROM donor WHERE discord_id = '{}';".format(discordid))
+                row = c.fetchone()
+                c.close()
+                db_close(db)
+
+                # If the donor exists, add a payment & update the validity
+                if row is not None:
+                    created = int(time.time())
+                    old_valid = int(row[3])
+                    valid = new_valid_remove_time(old_valid, month)
+                    watchdog(str(valid))
+                    db = db_connect()
+                    c = db.cursor()
+                    donationadded = False
+                    try:
+                        c.execute("""INSERT INTO donation (discord_id, amt, donationdate) VALUES (%s, %s, %s)""", (discordid, '-' + month, created))
+                        db.commit()
+                        donationadded = True
+                    except MySQLdb.Error as e:
+                        db.rollback()
+                        watchdog(str(e))
+                    c.close()
+                    db_close(db)
+
+                    if donationadded:
+                        db = db_connect()
+                        c = db.cursor()
+                        try:
+                            c.execute ("""UPDATE donor SET validdate=%s WHERE discord_id=%s""", (valid, discordid))
+                            db.commit()
+                        except:
+                            db.rollback()
+                        c.close()
+                        db_close(db)
+                        await channel.send("Removed `{} months` from user `{}` it will expire at `{}`".format(month, discordname, str(datetime.date.fromtimestamp(valid))))
+                    else:
+                        await channel.send("There was a problem removing a donation for donor `{}`. Contact an admin if this problem persists".format(discordname))
+                else:
+                    await channel.send("An error occurred trying to remove months from donor `{}` to the database, try again later or contact an administrator".format(user))
+            else:
+                await channel.send("An error occurred trying to remove months from donor `{}`".format(user))
 # -- End Donor functions
 
 # --- Helper Methods ---
 # Helper function to determine the validity
 def new_valid_time(valid, m):
-    # convert month to int, we jump one month ahead to get the last month 
+    # convert month to int, we jump one month ahead to get the last month
     m = int(m) + 1
     # Keep the unix timestamps for comparison
     now = int(time.time())
@@ -1037,8 +1161,8 @@ def new_valid_time(valid, m):
 
         # get unixtimestamp
         t_new_valid = int(time.mktime(d_new_valid.timetuple()))
-        
-        
+
+
         return t_new_valid
     else:
         # if the day of the month is lower than 25, it will count for this month
@@ -1051,13 +1175,32 @@ def new_valid_time(valid, m):
 
         return t_new_valid
 
+# Helper function to determine the validity
+def new_valid_remove_time(valid, m):
+    # convert month to int, we jump one month ahead to get the last month
+    m = int(m)
+    # Convert to datetime objects for relative adding
+    d_valid = datetime.date.fromtimestamp(valid)
+    # Add months
+    d_new_valid = d_valid - relativedelta(months=m)
+
+    watchdog(str(d_valid) + ' - ' + str(d_new_valid))
+    ldom = last_day_of_month(datetime.datetime.strptime(str(d_new_valid), '%Y-%m-%d'))
+    # get unixtimestamp
+    t_new_valid = int(time.mktime(ldom.timetuple()))
+    return t_new_valid
+
+def last_day_of_month(any_day):
+    next_month = any_day.replace(day=28) + datetime.timedelta(days=4)  # this will never fail
+    return next_month - datetime.timedelta(days=next_month.day)
+
 # Helper function to check permissions
 def roleacc(message, group):
     # distinguish whether the user is high privileged than @everyone
     stopUnauth = False
     # in PM determine the user roles from the server settings.
     if message.author.__class__.__name__ ==  'User':
-        msrv = client.get_server(discord_server)
+        msrv = client.get_guild(discord_server)
         usr = msrv.get_member(message.author.id)
     # in channel message, the Member object is available directly
     elif message.author.__class__.__name__ ==  'Member':
@@ -1069,13 +1212,13 @@ def roleacc(message, group):
         global super_admin
         # Cycle through the roles on the user object
         for sid in super_admin:
-            if usr.id == sid:
+            if str(usr.id) == sid:
                 stopUnauth = True
-                break        
+                break
         return stopUnauth
-    elif group == 'admin':    
+    elif group == 'admin':
         try:
-            getattr(usr, 'roles') 
+            getattr(usr, 'roles')
         except AttributeError:
             watchdog("-- Debug info -- ")
             watchdog("type: " + message.type.name)
@@ -1084,9 +1227,9 @@ def roleacc(message, group):
             return stopUnauth
 
         for role in usr.roles:
-           if role.id in roles_admin:
+           if str(role.id) in roles_admin:
              stopUnauth = True
-             break         
+             break
         return stopUnauth
     return stopUnauth
 
@@ -1130,6 +1273,7 @@ def _regex_from_encoded_pattern(s):
 # --- db functions ---
 # Helper function to do logging
 def watchdog(message):
+    print(message)
     if bot_debug == 1:
         date = str(datetime.datetime.now().strftime("%Y-%m-%d - %I:%M:%S"))
         f = open(os.path.join('log', str(datetime.datetime.now().strftime("%Y-%m-%d") + '-debug.log')), 'a')
@@ -1139,7 +1283,7 @@ def watchdog(message):
 # Helper function to get all mods and higher their id
 def get_management():
     mod_ids = []
-    server = client.get_server(discord_server)
+    server = client.get_guild(discord_server)
     for member in server.members:
         for role in member.roles:
             if role.id in roles_admin:
@@ -1176,7 +1320,7 @@ def variable_set(variable, value):
     if d is None:
         try:
             db = db_connect()
-            c = db.cursor() 
+            c = db.cursor()
             c.execute("""INSERT INTO system (variable, value) VALUES (%s, %s)""", (variable, value))
             db.commit()
             c.close()
@@ -1188,7 +1332,7 @@ def variable_set(variable, value):
     else:
         try:
             db = db_connect()
-            c = db.cursor() 
+            c = db.cursor()
             query = "UPDATE system SET value = %s WHERE variable = %s"
             c.execute(query, (value, variable))
             db.commit()
@@ -1215,14 +1359,4 @@ def db_close(connection):
 # --- End db functions ---
 # --- End helper Methods ---
 
-if discord_bot == 1:
-    client.run(discord_bothash)
-else:
-    loop = asyncio.get_event_loop()
-    try:
-        loop.run_until_complete(client.start(discord_user, discord_pass))
-        # loop.run_until_complete(client.connect())
-    except Exception:
-        loop.run_until_complete(client.logout())
-    finally:
-        loop.close()
+client.run(discord_bothash)

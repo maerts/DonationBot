@@ -1,7 +1,7 @@
 #!/bin/bash
 
 donbot(){
-    python3 DonationBot.py
+    python3.8 DonationBot.py
 }
 
 until donbot; do
