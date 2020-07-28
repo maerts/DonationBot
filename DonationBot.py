@@ -130,6 +130,8 @@ async def on_message(message):
             usr = server.get_member(message.author.id)
             await usr.send(returnmsg)
 
+    if '.userid' == message.content[0:7] and (roleacc(message, 'super') or roleacc(message, 'admin')) and str(message.channel.type) == 'text' and message.channel.name in channels_admin:
+        await user_get(message)
     if '.donor add' == message.content[0:10] and (roleacc(message, 'super') or roleacc(message, 'admin')):
         await donor_add(message)
     if '.donor remove' == message.content[0:13] and (roleacc(message, 'super') or roleacc(message, 'admin')):
@@ -156,6 +158,82 @@ async def on_message(message):
         await note_del(message)
     if '.note list' == message.content[0:10] and (roleacc(message, 'super') or roleacc(message, 'admin')):
         await note_list(message)
+
+
+##################################################
+# -- Note functions --
+# Helper function to check your donation expiration
+async def user_get(message):
+    server = client.get_guild(discord_server)
+    msg = message.content.lower().split()
+    channel = message.channel
+    if len(msg) < 2:
+        await channel.send("Yes, yes you are!")
+    else:
+        user = " ".join(msg[1:])
+        watchdog(str(user))
+        discordmember = None
+        # lookup the userid, a bit clunky but fastest way.
+        count = 0
+        duplicatemembers = []
+        for member in server.members:
+            if user_lookup(member, user):
+               discordmember = member
+               count = count + 1
+               duplicatemembers.append(member)
+        if discordmember is not None:
+            if count > 1:
+                em = discord.Embed(title="Multiple users found", description="I have found multiple users with this name")
+                await channel.send(embed=em)
+                for i, member in enumerate(duplicatemembers):
+                    em = discord.Embed()
+                    em.set_author(name=member.name, icon_url=member.avatar_url)
+                    em.add_field(name="User ID:", value=member.id, inline=False)
+                    em.add_field(name="Current Username:", value=member.display_name, inline=False)
+                    em.add_field(name="Current Nickname:", value=member.nick, inline=False)
+                    em.add_field(name="Unique:", value=member.name + "#" + member.discriminator, inline=False)
+                    em.add_field(name="User Since:", value=member.created_at, inline=False)
+                    em.add_field(name="Highest role:", value=member.top_role.name, inline=False)
+                    await channel.send(embed=em)
+            else:
+                member = discordmember
+                em = discord.Embed()
+                em.set_author(name=member.name, icon_url=member.avatar_url)
+                em.add_field(name="User ID:", value=member.id, inline=False)
+                em.add_field(name="Current Username:", value=member.display_name, inline=False)
+                em.add_field(name="Current Nickname:", value=member.nick, inline=False)
+                em.add_field(name="Unique:", value=member.name + "#" + member.discriminator, inline=False)
+                em.add_field(name="User Since:", value=member.created_at, inline=False)
+                em.add_field(name="Highest role:", value=member.top_role.name, inline=False)
+                await channel.send(embed=em)
+        else:
+            sugg = []
+            for member in server.members:
+                dn = levenshtein(member.display_name.lower(), user.lower()) if member.display_name is not None else 10
+                ni = levenshtein(member.nick.lower(), user.lower()) if member.nick is not None else 10
+                na = levenshtein(member.name.lower(), user.lower()) if member.name is not None else 10
+                nd = levenshtein(member.name.lower()+ "#" + str(member.discriminator), user.lower()) if member.name is not None else 10
+                if dn < 3:
+                    sugg.append(member.display_name.lower())
+                    continue
+                if ni < 3:
+                    sugg.append(member.nick.lower())
+                    continue
+                if na < 3:
+                    sugg.append(member.name.lower())
+                    continue
+                if nd < 3:
+                    sugg.append(member.name.lower()+ "#" + str(member.discriminator))
+                    continue
+
+            if len(sugg) == 0:
+                em = discord.Embed()
+                em.add_field(name="User {} not found".format(user), value="Please make sure you wrote the right id, name, nickname, unique name or display name.", inline=False)
+                await channel.send(embed=em)
+            else:
+                em = discord.Embed()
+                em.add_field(name="User {} not found".format(user), value="Could it be one of the following? `{}`".format(', '.join(sugg)), inline=False)
+                await channel.send(embed=em)
 
 ##################################################
 # -- Note functions --
@@ -1282,6 +1360,27 @@ def _regex_from_encoded_pattern(s):
         return re.compile(re.escape(s))
 
 # --- db functions ---
+# Helper function for levenshtein calculations.
+def levenshtein(s1, s2):
+    if len(s1) < len(s2):
+        return levenshtein(s2, s1)
+
+    # len(s1) >= len(s2)
+    if len(s2) == 0:
+        return len(s1)
+
+    previous_row = range(len(s2) + 1)
+    for i, c1 in enumerate(s1):
+        current_row = [i + 1]
+        for j, c2 in enumerate(s2):
+            insertions = previous_row[j + 1] + 1 # j+1 instead of j since previous_row and current_row are one character longer
+            deletions = current_row[j] + 1       # than s2
+            substitutions = previous_row[j] + (c1 != c2)
+            current_row.append(min(insertions, deletions, substitutions))
+        previous_row = current_row
+
+    return previous_row[-1]
+
 # Helper function to do logging
 def watchdog(message):
     print(message)
