@@ -751,7 +751,7 @@ async def donor_expire(message):
             duplicatemembers = []
             for member in server.members:
                 if user_lookup(member, user):
-                   discordid = member.id
+                   discordid = str(member.id)
                    discordname = member.name
                    count = count + 1
                    duplicatemembers.append(member)
@@ -759,7 +759,7 @@ async def donor_expire(message):
                 dup_msg = "I have discovered multiple users with this name.\nVerify and try it with the discriminator or id.\n"
                 dup_msg += "\n".rjust(35, '-')
                 for i, member in enumerate(duplicatemembers):
-                    dup_msg += str(i + 1) + ". **" + member.name + "#" + member.discriminator + "** (" + member.id + ")\n"
+                    dup_msg += str(i + 1) + ". **" + member.name + "#" + member.discriminator + "** (" + str(member.id) + ")\n"
                 await channel.send(dup_msg)
             else:
                 if discordid is not None:
@@ -1243,7 +1243,7 @@ def user_lookup(member, user):
     match_id = regex.findall(user)
     if len(match_id) == 1:
         user = match_id[0]
-    return str(member.name).lower() == user.lower() or str(member.name + '#' + member.discriminator).lower() == user or member.id == user or str(member.nick).lower() == user.lower()
+    return str(member.name).lower() == user.lower() or str(member.name + '#' + member.discriminator).lower() == user or str(member.id) == user or str(member.nick).lower() == user.lower()
 
 # Helper for regex
 def _regex_from_encoded_pattern(s):
