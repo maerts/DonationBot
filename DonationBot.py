@@ -118,8 +118,13 @@ async def on_message(message):
         if roleacc(message, 'super'):
             returnmsg += helpsamsg
         if str(message.channel.type) == 'text':
-            channel = message.channel
-            await channel.send(returnmsg)
+            if roleacc(message, 'super') or roleacc(message, 'admin'):
+                server = client.get_guild(discord_server)
+                usr = server.get_member(message.author.id)
+                await usr.send(returnmsg)
+            else:
+                channel = message.channel
+                await channel.send(returnmsg)
         else:
             server = client.get_guild(discord_server)
             usr = server.get_member(message.author.id)
@@ -171,7 +176,7 @@ async def note_add(message):
         duplicatemembers = []
         for member in server.members:
             if user_lookup(member, user):
-               discordid = member.id
+               discordid = str(member.id)
                discordname = member.name
                count = count + 1
                duplicatemembers.append(member)
@@ -249,7 +254,7 @@ async def note_list(message):
         duplicatemembers = []
         for member in server.members:
             if user_lookup(member, user):
-               discordid = member.id
+               discordid = str(member.id)
                discordname = member.name
                count = count + 1
                duplicatemembers.append(member)
@@ -628,7 +633,6 @@ async def donor_contrib(message):
         # Only admins can pass parameters to this function.
         if (roleacc(message, 'super') or roleacc(message, 'admin')):
             user = ' '.join(smsg[2:])
-            print(str(user))
             discordid = None
             discordname = ""
             # lookup the userid, a bit clunky but fastest way.
@@ -636,7 +640,7 @@ async def donor_contrib(message):
             duplicatemembers = []
             for member in server.members:
                 if user_lookup(member, user):
-                   discordid = member.id
+                   discordid = str(member.id)
                    discordname = member.name
                    count = count + 1
                    duplicatemembers.append(member)
@@ -849,10 +853,10 @@ async def donor_change(message):
         # lookup the userid, a bit clunky but fastest way.
         for member in server.members:
             if user_lookup(member, user):
-               odiscordid = member.id
+               odiscordid = str(member.id)
                omember = member
             if user_lookup(member, newuser):
-               ndiscordid = member.id
+               ndiscordid = str(member.id)
                nmember = member
             if odiscordid is not None and ndiscordid is not None:
                break
@@ -923,8 +927,12 @@ async def donor_add(message):
     else:
         # instance of server for later use
         # We expect these values.
-        user = msg[2]
-        month = msg[3]
+        # user = msg[2]
+        user = ""
+        for x in range(2, len(msg)-1):
+            user = user + " " + msg[x].strip()
+        user = user.strip()
+        month = msg[len(msg)-1]
 
         discordid = None
         discordname = ""
@@ -934,7 +942,7 @@ async def donor_add(message):
         duplicatemembers = []
         for member in server.members:
             if user_lookup(member, user):
-               discordid = member.id
+               discordid = str(member.id)
                discordname = member.name
                discordmember = member
                count = count + 1
@@ -1074,8 +1082,11 @@ async def donor_remove(message):
     else:
         # instance of server for later use
         # We expect these values.
-        user = msg[2]
-        month = msg[3]
+        user = ""
+        for x in range(2, len(msg)-1):
+            user = user + " " + msg[x].strip()
+        user = user.strip()
+        month = msg[len(msg)-1]
 
         discordid = None
         discordname = ""
@@ -1085,7 +1096,7 @@ async def donor_remove(message):
         duplicatemembers = []
         for member in server.members:
             if user_lookup(member, user):
-               discordid = member.id
+               discordid = str(member.id)
                discordname = member.name
                discordmember = member
                count = count + 1
