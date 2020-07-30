@@ -657,7 +657,7 @@ async def donor_clean(message):
             if member.id == d[0]:
                 try:
                     role = discord.utils.get(server.roles, name=donor_role)
-                    await client.remove_roles(member, role)
+                    await member.remove_roles(role, reason="Donation status expired.")
                     tmp = '- {} removed from {}\n'.format(member.name, donor_role)
                     if bot_debug == 1:
                         tmp = 'Debug: Member {} should be removed now.\n'.format(d[1])
@@ -687,7 +687,7 @@ async def donor_clean(message):
             watchdog(member.name + '#' + member.discriminator + ' - ' + member.id)
             try:
                 role = discord.utils.get(server.roles, name=donor_role)
-                await client.remove_roles(member, role)
+                await member.remove_roles(role, reason="Donation status expired.")
                 tmp = '- {} removed from {}\n'.format(member.name + '#' + member.discriminator + ' (' + member.id + ')', donor_role)
                 if bot_debug == 1:
                     watchdog('Debug: Member {} should be removed now.\n'.format(d[1]))
