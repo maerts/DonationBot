@@ -620,11 +620,11 @@ async def async_loop_send_messages(list, type):
         counter = counter + 1
         val = list[key];
         try:
-            usr = server.get_member(key)
+            usr = server.get_member(int(key))
             if type == 'emb':
-                await return_channel.send(embed=val)
+                await usr.send(embed=val)
             else:
-                await return_channel.send(val)
+                await usr.send(val)
             watchdog('send message to {} of type {}'.format(usr.name, type))
         except Exception as exc:
             watchdog(str(exc))
