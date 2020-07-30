@@ -584,7 +584,7 @@ async def donor_expiration(message):
     for i, d in enumerate(data):
         counter = counter + 1
         if notify:
-            user = server.get_member(str(d[0])) #
+            user = server.get_member(int(d[0])) #
             if user != None:
                 notify_members[str(d[0])] = donor_expiremsg
             else:
@@ -603,13 +603,13 @@ async def donor_expiration(message):
         try:
             asyncio.ensure_future(async_loop_send_messages(notify_members, 'txt'), loop=client.loop).add_done_callback(async_loop_complete_result)
         except Exception as exc:
-            print(exc)
+            watchdog(exc)
 
 async def async_loop_send_messages(list, type):
     server = client.get_guild(discord_server)
     counter = 0
 
-    return_channel = server.get_member(message.author.id)
+    # return_channel = server.get_member(message.author.id)
 
     # watchdog(str(list))
     for key in list.keys():
