@@ -1073,7 +1073,7 @@ async def donor_add(message):
                         if old_valid < created:
                             try:
                                 role = discord.utils.get(server.roles, name=donor_role)
-                                await client.add_roles(discordmember, role)
+                                await discordmember.add_roles(role, reason="Donation made for {} months".format(month))
                             except Exception:
                                 watchdog(traceback.format_exc())
                                 watchdog(sys.exc_info()[0])
@@ -1119,7 +1119,7 @@ async def donor_add(message):
                             role = discord.utils.get(server.roles, name=donor_role)
                             watchdog(str(role.name) + ' - ' + str(role.id))
                             try:
-                                await client.add_roles(discordmember, role)
+                                await discordmember.add_roles(role, reason="Donation made for {} months".format(month))
                             except Exception:
                                 watchdog(traceback.format_exc())
                                 watchdog(sys.exc_info()[0])
