@@ -3,6 +3,7 @@ import discord
 import re
 import time
 import os
+import math
 import configparser
 import traceback
 import MySQLdb
@@ -213,16 +214,16 @@ async def user_get(message):
                 ni = levenshtein(member.nick.lower(), user.lower()) if member.nick is not None else 10
                 na = levenshtein(member.name.lower(), user.lower()) if member.name is not None else 10
                 nd = levenshtein(member.name.lower()+ "#" + str(member.discriminator), user.lower()) if member.name is not None else 10
-                if dn < 3:
+                if member.display_name is not None and dn < levenshtein_len(member.display_name.lower()):
                     sugg.append(member.display_name.lower())
                     continue
-                if ni < 3:
+                if member.nick is not None and ni < levenshtein_len(member.nick.lower()):
                     sugg.append(member.nick.lower())
                     continue
-                if na < 3:
+                if member.name is not None and na < levenshtein_len(member.name.lower()):
                     sugg.append(member.name.lower())
                     continue
-                if nd < 3:
+                if member.name is not None and nd < levenshtein_len(member.name.lower()+ "#" + str(member.discriminator)):
                     sugg.append(member.name.lower()+ "#" + str(member.discriminator))
                     continue
 
@@ -1359,7 +1360,6 @@ def _regex_from_encoded_pattern(s):
     else: # not an encoded regex
         return re.compile(re.escape(s))
 
-# --- db functions ---
 # Helper function for levenshtein calculations.
 def levenshtein(s1, s2):
     if len(s1) < len(s2):
@@ -1380,6 +1380,14 @@ def levenshtein(s1, s2):
         previous_row = current_row
 
     return previous_row[-1]
+
+def levenshtein_len(string):
+    if len(string) > 7:
+        return int(math.ceil(len(string) * 0.4))
+    else:
+        return 3
+
+# --- db functions ---
 
 # Helper function to do logging
 def watchdog(message):
