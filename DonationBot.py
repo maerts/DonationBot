@@ -508,7 +508,7 @@ async def donor_freeloader(message):
 
     valid = []
     for i, d in enumerate(data):
-        valid.append(str(d[0]))
+        valid.append(int(d[0]))
 
     db = db_connect()
     c = db.cursor()
@@ -539,7 +539,7 @@ async def donor_freeloader(message):
             name = str(member.name + '#' + member.discriminator)
             if member.name == '':
                 name = str(member.id)
-            tmp = str(name).ljust(50) + expired_date.ljust(15) + member.id + '\n'
+            tmp = str(name).ljust(50) + expired_date.ljust(15) + str(member.id) + '\n'
             if (len(tmp) + len(msg)) >  1997:
                 msg += '```'
                 await return_channel.send(msg)
@@ -650,27 +650,27 @@ async def donor_clean(message):
     msg = '```'
     msg += 'Coroutine to remove the donor role from expired members\n'
     msg += ''.ljust(55, '-') + '\n'
+    role = discord.utils.get(server.roles, name=donor_role)
     for i, d in enumerate(data):
         #0=discord_id,1=name,2=startdate,3=validdate
-        tmp = ""
         # lookup the userid, a bit clunky but fastest way.
         for member in server.members:
-            if member.id == d[0]:
+            tmp = ""
+            if member.id == int(d[0]) and role in member.roles:
                 try:
-                    role = discord.utils.get(server.roles, name=donor_role)
                     await member.remove_roles(role, reason="Donation status expired.")
                     tmp = '- {} removed from {}\n'.format(member.name, donor_role)
                     if bot_debug == 1:
-                        tmp = 'Debug: Member {} should be removed now.\n'.format(d[1])
+                        watchdog('Debug: Member {} should be removed now.\n'.format(str(d[1])))
                 except:
                     tmp = '# An error occured try to remove {} removed from {}\n'.format(member.name, donor_role)
-                break
-            if (len(tmp) + len(msg)) >  1997:
-                msg += '```'
-                await return_channel.send(msg)
-                msg = '```'
-            msg += tmp
 
+                if (len(tmp) + len(msg)) >  1997:
+                    msg += '```'
+                    await return_channel.send(msg)
+                    msg = '```'
+                msg += tmp
+    time.sleep(5)
     # verify existence of discordid on the server
     db = db_connect()
     c = db.cursor()
@@ -681,15 +681,15 @@ async def donor_clean(message):
 
     valid = []
     for i, d in enumerate(data):
-        valid.append(str(d[0]))
-
+        valid.append(int(d[0]))
+    tmp = ""
     for member in server.members:
         if member.top_role.name == donor_role and member.id not in valid:
-            watchdog(member.name + '#' + member.discriminator + ' - ' + member.id)
+            watchdog(member.name + '#' + member.discriminator + ' - ' + str(member.id))
             try:
                 role = discord.utils.get(server.roles, name=donor_role)
                 await member.remove_roles(role, reason="Donation status expired.")
-                tmp = '- {} removed from {}\n'.format(member.name + '#' + member.discriminator + ' (' + member.id + ')', donor_role)
+                tmp = '- {} removed from {}\n'.format(member.name + '#' + str(member.discriminator) + ' (' + str(member.id) + ')', donor_role)
                 if bot_debug == 1:
                     watchdog('Debug: Member {} should be removed now.\n'.format(d[1]))
             except:
