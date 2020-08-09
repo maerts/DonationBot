@@ -1022,7 +1022,8 @@ async def donor_add(message):
         for member in server.members:
             if user_lookup(member, user):
                discordid = str(member.id)
-               discordname = member.name
+               # discordname = member.name
+               discordname = member.name + "#" + member.discriminator
                discordmember = member
                count = count + 1
                duplicatemembers.append(member)
@@ -1093,7 +1094,7 @@ async def donor_add(message):
                     c = db.cursor()
                     donoradded = False
                     try:
-                        c.execute("""INSERT INTO donor (discord_id, name, startdate, validdate) VALUES (%s, %s, %s, %s)""", (discordid, discordname, created, valid))
+                        c.execute("""INSERT INTO donor (discord_id, name, startdate, validdate) VALUES (%s, %s, %s, %s)""", (discordid, str(discordname), created, valid))
                         db.commit()
                         donoradded = True
                     except MySQLdb.Error as e:
@@ -1126,8 +1127,8 @@ async def donor_add(message):
                                 watchdog(sys.exc_info()[0])
                                 if bot_debug == 1:
                                     watchdog('Member {} could not be added'.format(discordname))
-                                await channel.send("Forbidden error: There was an error trying to add `{}` to the `{}`.".format(discordname, donor_role))
-                            await channel.send("Added donor `{}` to the database with a first contribution for `{} months`".format(discordname, month))
+                                await channel.send("Forbidden error: There was an error trying to add `{}` to the `{}`.".format(str(discordname), donor_role))
+                            await channel.send("Added donor `{}` to the database with a first contribution for `{} months`".format(str(discordname), month))
                             if donor_enablewelcome == 1:
                                 welcome = None
                                 for member in server.members:
